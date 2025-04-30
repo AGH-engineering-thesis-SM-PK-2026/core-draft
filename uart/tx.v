@@ -6,7 +6,7 @@
  */
 
 module uart_tx #(
-    parameter PRESCALER = 625; // for 6 MHz bus clock
+    parameter PRESCALER = 625 // for 6 MHz bus clock
 ) (
     input wire BusClk,
     input wire BusWr,
