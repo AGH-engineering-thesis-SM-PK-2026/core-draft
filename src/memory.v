@@ -59,11 +59,11 @@ always @(posedge clk) begin
     
     // Memory operations
     else if (w_en) begin
-        mem[w_addr[ADDR_WIDTH:0]] <= w_data;
+        mem[w_addr_wrd] <= w_data;
         state <= `MEMORY_STATE_SUCCESS;
     end
     else if (r_en) begin
-        r_data <= mem[r_addr[ADDR_WIDTH:0]];
+        r_data <= mem[r_addr_wrd];
         state <= `MEMORY_STATE_SUCCESS;
     end
 end
