@@ -175,9 +175,8 @@ always @(posedge clk) begin
         `CORE_STATE_DECODE: begin
             // Decoding is now handled by the imm_decoder.
             // Registers are being automaticly read from the register file as well.
-            // We need to wait for the regfile and imm_decoder to finish, disable 
-            // the instruction memory read, and possibly enable the Branch Unit or ALU
-            mem_instr_r_en <= 1'b0;
+            // We need to wait for the regfile and imm_decoder to finish, and possibly 
+            // enable the Branch Unit or ALU
             case (opcode)
                 `OP_ALU, `OP_ALUI: begin
                     // ALU instructions, we need to enable the ALU
@@ -200,16 +199,8 @@ always @(posedge clk) begin
 
         `CORE_STATE_EXECUTE: begin
             case (opcode)
-                `OP_ALU, `OP_ALUI: begin
-                    // ALU is working. We do not need to do anything here.
-                    state <= `CORE_STATE_MEMORY;
-                end
-
-                `OP_BRANCH: begin
-                    // Branching Unit has finished, we may need to update the PC
-                    if (br_taken) begin
-                        pc <= pc + imm;
-                    end
+                `OP_ALU, `OP_ALUI, `OP_BRANCH: begin
+                    // Branching Unit/ALU is working. We do not need to do anything here.
                     state <= `CORE_STATE_MEMORY;
                 end
 
@@ -273,13 +264,15 @@ always @(posedge clk) begin
             br_en <= 1'b0;
         end
 
-        `CORE_STATE_MEMORY: begin
-            // In case of load instruction, we need to read the data from memory into the 
-            // register file. 
-            // In case of any other instruction, we just wait.
+        `CORE_STATE_MEMORY: begin 
             if(opcode == `OP_LOAD) begin
+                // In case of load instruction, we need to read the data from memory into the 
+                // register file.
                 w_data <= mem_data_r_data;
             end
+            
+            // In case of any other instruction, we just wait.
+
             // After memory access, we need to disable the data memory read/write
             mem_data_r_en <= 1'b0;
             mem_data_w_en <= 1'b0;
@@ -299,7 +292,7 @@ always @(posedge clk) begin
                 end
             endcase
 
-            state <= `CORE_STATE_FETCH;
+            state <= `CORE_STATE_WRITEBACK;
         end
 
         `CORE_STATE_WRITEBACK: begin
@@ -307,7 +300,14 @@ always @(posedge clk) begin
             w_en <= 1'b0;
 
             // Prepare for fetching the next instruction
-            pc <= pc + 4;
+            if (opcode == `OP_BRANCH && br_taken) begin
+                // Branch taken, we need to update the PC
+                pc <= pc + imm + 4;
+            end
+            else begin
+                // No branch taken, we just increment the PC
+                pc <= pc + 4;
+            end
             mem_instr_r_en <= 1'b1;
 
             state <= `CORE_STATE_FETCH;
