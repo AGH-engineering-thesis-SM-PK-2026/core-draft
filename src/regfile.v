@@ -24,8 +24,8 @@ module regfile (
 
 reg [31:0] reg_data [0:31];
 
-assign r_data_1 = reg_data[r_sel_1];
-assign r_data_2 = reg_data[r_sel_2];
+assign r_data_1     = reg_data[r_sel_1];
+assign r_data_2     = reg_data[r_sel_2];
 assign dbg_reg_data = reg_data[dbg_reg_sel];
 
 always @(posedge clk) begin

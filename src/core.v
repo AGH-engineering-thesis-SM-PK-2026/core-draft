@@ -59,9 +59,9 @@ module core (
 
     // Debug interface, all the outputs are hardwired to the core parts
     output      [2:0]   dbg_state,          // state of the core
-    output      [31:0]  dbg_pc,             // program counter
-    output      [31:0]  dbg_instr,          // currently executed instruction
-    output      [(32*32)-1:0] dbg_reg_data  // register file data
+    output      [31:0]  dbg_pc,             // debug pc
+    input       [4:0]   dbg_reg_sel,        // debug reg selector
+    output      [31:0]  dbg_reg_data        // debug reg data
 );
 
 reg     [2:0]   state;          // state of the core
@@ -104,6 +104,9 @@ wire    [31:0]  alu_res;        // result of the ALU operation
 reg             br_en;          // branch enable
 wire            br_taken;       // branch taken
 
+assign dbg_state = state;
+assign dbg_pc = pc;
+
 regfile regfile1 (
     .clk(clk),
     .rst_n(rst_n),
@@ -115,7 +118,10 @@ regfile regfile1 (
 
     .w_en(w_en),
     .w_sel(rd),
-    .w_data(w_data)
+    .w_data(w_data),
+    
+    .dbg_reg_sel(dbg_reg_sel),
+    .dbg_reg_data(dbg_reg_data)
 );
 
 imm_decoder imm_decoder1 (

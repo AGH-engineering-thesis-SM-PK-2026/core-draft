@@ -1,8 +1,10 @@
 `timescale 1ns / 1ps
 
 module toplevel(
-    input       GLOBAL_CLK_IN,
-    input       GLOBAL_RST_N
+    input               GLOBAL_CLK_IN,
+    input               GLOBAL_RST_N,
+    input   [4:0]       jb_sel,
+    output  [2:0]       jb_state
 );
 
 // Instruction memory bus
@@ -22,10 +24,8 @@ wire    [31:0]  mem_data_w_addr;
 wire    [31:0]  mem_data_w_data;
 
 // Debug bus
-wire    [2:0]   dbg_state;
 wire    [31:0]  dbg_pc;
-wire    [31:0]  dbg_instr;
-wire    [(32*32)-1:0] dbg_reg_data;
+wire    [31:0]  dbg_reg_data;
 
 memory mem_data(
     .clk(GLOBAL_CLK_IN),
@@ -62,9 +62,9 @@ core cpu1(
     .mem_data_w_en(mem_data_w_en),
     .mem_data_w_addr(mem_data_w_addr),
     .mem_data_w_data(mem_data_w_data),
-    .dbg_state(dbg_state),
+    .dbg_state(jb_state),
     .dbg_pc(dbg_pc),
-    .dbg_instr(dbg_instr),
+    .dbg_reg_sel(jb_sel),
     .dbg_reg_data(dbg_reg_data)
 );
 
