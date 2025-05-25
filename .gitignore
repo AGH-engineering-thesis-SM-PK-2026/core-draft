@@ -64,3 +64,6 @@ xvlog.*
 ## checkpoint files
 *.dcp
 
+## Project specific files
+riscv-cpu.**
+!riscv-cpu.xpr
