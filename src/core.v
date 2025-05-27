@@ -61,7 +61,10 @@ module core (
     output      [2:0]   dbg_state,          // state of the core
     output      [31:0]  dbg_pc,             // debug pc
     input       [4:0]   dbg_reg_sel,        // debug reg selector
-    output      [31:0]  dbg_reg_data        // debug reg data
+    output      [31:0]  dbg_reg_data,       // debug reg data
+
+    input       [7:0]   io_in,              // IO input pins
+    output      [7:0]   io_out              // IO output pins
 );
 
 reg     [2:0]   state;          // state of the core
@@ -121,7 +124,10 @@ regfile regfile1 (
     .w_data(w_data),
     
     .dbg_reg_sel(dbg_reg_sel),
-    .dbg_reg_data(dbg_reg_data)
+    .dbg_reg_data(dbg_reg_data),
+
+    .io_in(io_in),
+    .io_out(io_out)
 );
 
 imm_decoder imm_decoder1 (

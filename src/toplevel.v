@@ -4,7 +4,9 @@ module toplevel(
     input               GLOBAL_CLK_IN,
     input               GLOBAL_RST_N,
     input   [4:0]       jb_sel,
-    output  [2:0]       jb_state
+    output  [2:0]       jb_state,
+    input   [7:0]       jc_p,
+    output  [7:0]       jd_p
 );
 
 // Instruction memory bus
@@ -65,7 +67,9 @@ core cpu1(
     .dbg_state(jb_state),
     .dbg_pc(dbg_pc),
     .dbg_reg_sel(jb_sel),
-    .dbg_reg_data(dbg_reg_data)
+    .dbg_reg_data(dbg_reg_data),
+    .io_in(jc_p),
+    .io_out(jd_p)
 );
 
 
