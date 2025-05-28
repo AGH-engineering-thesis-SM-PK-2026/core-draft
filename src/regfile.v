@@ -19,7 +19,7 @@ module regfile (
     input       [31:0]  w_data,     // data to write
 
     input       [4:0]   dbg_reg_sel, // multiplex debug out
-    output      [31:0]  dbg_reg_data  // debug data
+    output      [31:0]  dbg_reg_data // debug data
 );
 
 reg [31:0] reg_data [0:31];
@@ -28,20 +28,14 @@ assign r_data_1     = reg_data[r_sel_1];
 assign r_data_2     = reg_data[r_sel_2];
 assign dbg_reg_data = reg_data[dbg_reg_sel];
 
-always @(posedge clk) begin
-    if (!rst_n) begin
-        if (w_en && (w_sel != 5'b00000)) begin  // Don't write to register x0
-            reg_data[w_sel] <= w_data;
-        end
-    end else begin: CLEAR_REG
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin: CLEAR_REG
         integer i;
         for (i = 0; i < 32; i = i + 1) reg_data[i] <= 32'h00000000; // Reset all registers to 0
     end
-end
-
-initial begin: CLEAR_REG_INIT
-    integer i;
-    for (i = 0; i < 32; i = i + 1) reg_data[i] <= 32'h00000000; // Reset all registers to 0
+    else if (w_en && (w_sel != 5'b00000)) begin  // Don't write to register x0
+        reg_data[w_sel] <= w_data;
+    end
 end
 
 endmodule

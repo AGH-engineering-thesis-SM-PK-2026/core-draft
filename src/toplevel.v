@@ -3,8 +3,8 @@
 module toplevel(
     input               GLOBAL_CLK_IN,
     input               GLOBAL_RST_N,
-    input   [4:0]       jb_sel,
-    output  [2:0]       jb_state
+    input   [3:0]       jb_sel,
+    output  [3:0]       jb_state
 );
 
 // Instruction memory bus
@@ -26,8 +26,9 @@ wire    [31:0]  mem_data_w_data;
 // Debug bus
 wire    [31:0]  dbg_pc;
 wire    [31:0]  dbg_reg_data;
+wire    [4:0]   dbg_reg_sel;
 
-memory mem_data(
+memory #(.INIT_FILE("init_data.mem")) mem_data(
     .clk(GLOBAL_CLK_IN),
     .r_en(mem_data_r_en),
     .r_addr(mem_data_r_addr),
@@ -35,9 +36,9 @@ memory mem_data(
     .w_en(mem_data_w_en),
     .w_addr(mem_data_w_addr),
     .w_data(mem_data_w_data)
-);
+ );
 
-memory mem_instr(
+memory #(.INIT_FILE("init_instr.mem")) mem_instr(
     .clk(GLOBAL_CLK_IN),
     .r_en(mem_instr_r_en),
     .r_addr(mem_instr_r_addr),
@@ -62,11 +63,13 @@ core cpu1(
     .mem_data_w_en(mem_data_w_en),
     .mem_data_w_addr(mem_data_w_addr),
     .mem_data_w_data(mem_data_w_data),
-    .dbg_state(jb_state),
+    .dbg_state(jb_state),    
     .dbg_pc(dbg_pc),
-    .dbg_reg_sel(jb_sel),
-    .dbg_reg_data(dbg_reg_data)
+    .dbg_reg_data(dbg_reg_data),
+    .dbg_reg_sel(dbg_reg_sel)
 );
+
+
 
 
 
