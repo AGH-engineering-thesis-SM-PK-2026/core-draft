@@ -21,19 +21,20 @@
 // - interrupts
 // - Load/Store half word and byte
 // - check for correct endianness handling
-// - define the correct naming convention for the stages (i.e. if STATE_FETCH actions are 
-//      called *before* or *after* fetching)
+// - t
+// - CLOCK ENABLE
 
 `include "opcodes.vh"
 
-`define CORE_STATE_INIT         3'b000
-`define CORE_STATE_FETCH        3'b001
-`define CORE_STATE_DECODE       3'b010
-`define CORE_STATE_EXECUTE      3'b011
-`define CORE_STATE_MEMORY       3'b100
-`define CORE_STATE_WRITEBACK    3'b101
-`define CORE_STATE_HALT         3'b110
-`define CORE_STATE_ERROR        3'b111
+`define CORE_STATE_INIT         4'b0000
+`define CORE_STATE_FETCH        4'b0001
+`define CORE_STATE_DECODE       4'b0010
+`define CORE_STATE_EXECUTE      4'b0011
+`define CORE_STATE_MEMORY       4'b0100
+`define CORE_STATE_WRITEBACK    4'b0101
+`define CORE_STATE_HALT         4'b0110
+`define CORE_STATE_ERROR        4'b0111
+`define TMP_STATE_FETCH_DELAYED 4'b1001
 
 module core (
     input               clk,
@@ -41,11 +42,11 @@ module core (
 
     // Instruction memory interface
     output reg          mem_instr_r_en,     // read enable
-    output reg  [31:0]  mem_instr_r_addr,   // 32-bit address
+    output      [31:0]  mem_instr_r_addr,   // 32-bit address
     input       [31:0]  mem_instr_r_data,   // 32-bits of data
 
     output reg          mem_instr_w_en,     // write enable
-    output      [31:0]  mem_instr_w_addr,   // 32-bit address, hardwired to PC
+    output reg  [31:0]  mem_instr_w_addr,   // 32-bit address, hardwired to PC
     output reg  [31:0]  mem_instr_w_data,   // 32-bits of data
 
     // Data memory interface
@@ -58,16 +59,16 @@ module core (
     output reg  [31:0]  mem_data_w_data,    // 32-bits of data
 
     // Debug interface, all the outputs are hardwired to the core parts
-    output      [2:0]   dbg_state,          // state of the core
+    output      [3:0]   dbg_state,          // state of the core
     output      [31:0]  dbg_pc,             // debug pc
     input       [4:0]   dbg_reg_sel,        // debug reg selector
     output      [31:0]  dbg_reg_data        // debug reg data
 );
 
-reg     [2:0]   state;          // state of the core
+reg     [3:0]   state;          // state of the core
 reg     [31:0]  pc;             // program counter
 
-assign mem_instr_w_addr = pc;   // We read from the instruction memory only at the PC address
+assign mem_instr_r_addr = pc;   // We read from the instruction memory only at the PC address
 
 reg     [31:0]  instr;          // buffer for the currently executed instruction
 
@@ -85,7 +86,7 @@ assign funct3       = instr[14:12];
 assign rs1          = instr[19:15];
 assign rs2          = instr[24:20];
 assign funct7       = instr[31:25];
-assign alu_src_sel  = opcode[6]; // differentiate between R-type and I-type instructions
+assign alu_src_sel  = opcode[5]; // differentiate between R-type and I-type instructions
 
 // regfile interface
 wire    [31:0]  r_data_1;       // data from the first register
@@ -159,7 +160,7 @@ branch_unit branch_unit1 (
     .br_taken(br_taken)
 );
 
-always @(posedge clk) begin 
+always @(posedge clk) begin
     case(state)
         `CORE_STATE_INIT: begin
             // Reset the program counter
@@ -168,9 +169,14 @@ always @(posedge clk) begin
             // Prepare for fetching the first instruction
             mem_instr_r_en <= 1'b1;
 
-            state <= `CORE_STATE_FETCH;
+            state <= `TMP_STATE_FETCH_DELAYED;
         end
 
+        `TMP_STATE_FETCH_DELAYED: begin
+            // TODO: Find a better way to handle the delay in fetching the instruction.
+            state <= `CORE_STATE_FETCH;
+        end
+        
         `CORE_STATE_FETCH: begin
             // Read from instruction memory
             instr <= mem_instr_r_data;
@@ -316,13 +322,19 @@ always @(posedge clk) begin
             end
             mem_instr_r_en <= 1'b1;
 
-            state <= `CORE_STATE_FETCH;
+            state <= `TMP_STATE_FETCH_DELAYED;
         end
 
         `CORE_STATE_ERROR, `CORE_STATE_HALT: begin 
             // Error or halt state, we do nothing and wait for reset
         end
     endcase
+end
+
+initial begin
+    state <= `CORE_STATE_INIT;
+    pc <= 32'b0000;
+    instr <= 32'b0;
 end
 
 endmodule

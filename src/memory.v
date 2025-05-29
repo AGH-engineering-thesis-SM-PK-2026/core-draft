@@ -10,7 +10,7 @@
 
 // TODO:
 // - add support for 8-bit and 16-bit access (memory masking)
-// - parametrize error handling
+// - parametrize error handling (generate)
 // - consider allowing simultaneous R/W
 
 `define MEMORY_STATE_SUCCESS        2'b00   // No error
@@ -38,6 +38,12 @@ module memory #(
 
 (* ram_style = "block" *)
 reg     [31:0]  mem [0:MEMORY_SIZE_WORDS-1];
+
+
+wire    [29:0]  r_addr_wrd;
+wire    [1:0]   r_addr_offset;
+wire    [29:0]  w_addr_wrd;
+wire    [1:0]   w_addr_offset;
 
 assign r_addr_wrd       = r_addr[ADDR_WIDTH:2];
 assign r_addr_offset    = r_addr[1:0];

@@ -100,9 +100,9 @@
 `define FUNCT3_BGEU     3'b111      // Branch if Greater than or Equal Unsigned
 
 // instruction type matching patterns
-`define OPCODE_TYPE_R   (`OP_ALU)
-`define OPCODE_TYPE_I   (`OP_ALUI | `OP_LOAD | `OP_JALR | `OP_ENVIRONMENT)
-`define OPCODE_TYPE_S   (`OP_STORE)
-`define OPCODE_TYPE_B   (`OP_BRANCH)
-`define OPCODE_TYPE_J   (`OP_JAL)
-`define OPCODE_TYPE_U   (`OP_LUI | `OP_AUIPC)
+`define OPCODE_TYPE_R   `OP_ALU
+`define OPCODE_TYPE_I   `OP_ALUI,`OP_LOAD,`OP_JALR,`OP_ENVIRONMENT
+`define OPCODE_TYPE_S   `OP_STORE
+`define OPCODE_TYPE_B   `OP_BRANCH
+`define OPCODE_TYPE_J   `OP_JAL
+`define OPCODE_TYPE_U   `OP_LUI,`OP_AUIPC
