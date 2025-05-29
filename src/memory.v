@@ -19,7 +19,6 @@
 `define MEMORY_STATE_ALIGNMENT      2'b11   // Aliginment error
 
 module memory #(
-    parameter HAS_ERROR_CHECKING = true,
     parameter MEMORY_SIZE_WORDS = 1024,                     // Memory size in 32-bit words
     parameter INIT_FILE         = "",                       // Path to memory initialization file. Zero-initialized if none is provided.
     parameter ADDR_WIDTH        = $clog2(MEMORY_SIZE_WORDS) // Memory bus size. By default, the size needed to address MEMORY_SIZE_WORDS.

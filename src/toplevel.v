@@ -1,6 +1,9 @@
 `timescale 1ns / 1ps
 
-module toplevel(
+module toplevel #(
+    parameter DATA_INIT_FILE        = "",
+    parameter INSTR_INIT_FILE       = ""
+) (
     input               GLOBAL_CLK_IN,
     input               GLOBAL_RST_N,
     input   [3:0]       jb_sel,
@@ -28,7 +31,7 @@ wire    [31:0]  dbg_pc;
 wire    [31:0]  dbg_reg_data;
 wire    [4:0]   dbg_reg_sel;
 
-memory #(.INIT_FILE("init_data.mem")) mem_data(
+memory #(.INIT_FILE(DATA_INIT_FILE)) mem_data(
     .clk(GLOBAL_CLK_IN),
     .r_en(mem_data_r_en),
     .r_addr(mem_data_r_addr),
@@ -38,7 +41,7 @@ memory #(.INIT_FILE("init_data.mem")) mem_data(
     .w_data(mem_data_w_data)
  );
 
-memory #(.INIT_FILE("init_instr.mem")) mem_instr(
+memory #(.INIT_FILE(INSTR_INIT_FILE)) mem_instr(
     .clk(GLOBAL_CLK_IN),
     .r_en(mem_instr_r_en),
     .r_addr(mem_instr_r_addr),

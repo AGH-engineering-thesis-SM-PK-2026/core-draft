@@ -86,7 +86,7 @@ assign funct3       = instr[14:12];
 assign rs1          = instr[19:15];
 assign rs2          = instr[24:20];
 assign funct7       = instr[31:25];
-assign alu_src_sel  = opcode[6]; // differentiate between R-type and I-type instructions
+assign alu_src_sel  = opcode[5]; // differentiate between R-type and I-type instructions
 
 // regfile interface
 wire    [31:0]  r_data_1;       // data from the first register

@@ -19,6 +19,7 @@ module imm_decoder (
     output reg  [31:0]  imm            // immediate value, decoded and sign-extended
 );
 
+wire    [6:0] opcode;
 assign opcode = instr[6:0];
 
 always @(posedge clk) begin
@@ -36,7 +37,7 @@ always @(posedge clk) begin
         `OPCODE_TYPE_U:     // U-type immediate value
             imm <= {instr[31:12], 12'b0};
         default:            // error case, prevent latches
-            imm <= 32'b0;
+            imm <= 32'b0101010101010101;
     endcase
 end
 
