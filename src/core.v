@@ -126,17 +126,11 @@ regfile regfile1 (
 );
 
 imm_decoder imm_decoder1 (
-    .clk(clk),
-    .rst_n(rst_n),
-
     .instr(instr),
     .imm(imm)
 );
 
 alu alu1 (
-    .clk(clk),
-    .rst_n(rst_n),
-
     .funct3(funct3),
     .funct7(funct7),
     
@@ -150,9 +144,6 @@ alu alu1 (
 );
 
 branch_unit branch_unit1 (
-    .clk(clk),
-    .rst_n(rst_n),
-
     .br_en(br_en),
     .funct3(funct3),
     .br_data_a(r_data_1),
