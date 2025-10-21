@@ -25,14 +25,15 @@
 
 `include "opcodes.vh"
 
-`define CORE_STATE_INIT         3'b000
-`define CORE_STATE_FETCH        3'b001
-`define CORE_STATE_DECODE       3'b010
-`define CORE_STATE_EXECUTE      3'b011
-`define CORE_STATE_MEMORY       3'b100
-`define CORE_STATE_WRITEBACK    3'b101
-`define CORE_STATE_HALT         3'b110
-`define CORE_STATE_ERROR        3'b111
+`define CORE_STATE_INIT         4'b0000
+`define CORE_STATE_FETCH        4'b0001
+`define CORE_STATE_DECODE       4'b0010
+`define CORE_STATE_EXECUTE      4'b0011
+`define CORE_STATE_MEMORY       4'b0100
+`define CORE_STATE_WRITEBACK    4'b0101
+`define CORE_STATE_HALT         4'b0110
+`define CORE_STATE_ERROR        4'b0111
+`define TMP_STATE_FETCH_DELAYED 4'b1001
 
 module core (
     input               clk,                
@@ -59,13 +60,13 @@ module core (
     output reg  [31:0]  mem_data_w_data,    // 32-bits of data
 
     // Debug interface, all the outputs are hardwired to the core parts
-    output      [2:0]   dbg_state,          // state of the core
+    output      [3:0]   dbg_state,          // state of the core
     output      [31:0]  dbg_pc,             // debug pc
     input       [4:0]   dbg_reg_sel,        // debug reg selector
     output      [31:0]  dbg_reg_data        // debug reg data
 );
 
-reg     [2:0]   state;          // state of the core
+reg     [3:0]   state;          // state of the core
 reg     [31:0]  pc;             // program counter
 
 assign mem_instr_r_addr = pc;   // We read from the instruction memory only at the PC address
@@ -310,6 +311,12 @@ always @(posedge clk) begin
             end
         endcase
     end
+end
+
+initial begin
+    state <= `CORE_STATE_INIT;
+    pc <= 32'b0000;
+    instr <= 32'b0;
 end
 
 initial begin
