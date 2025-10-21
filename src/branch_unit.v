@@ -6,14 +6,11 @@
  *****************************************************************************/
 
 // TODO:
-// - Add states for branching operations (error handling)
+// - Consider adding states for branching operations (error handling)
 
 `include "opcodes.vh"
 
 module branch_unit (
-    input               clk,
-    input               rst_n,
-
     input               br_en,      // branch enable
     input       [2:0]   funct3,     // branch operation code
     input       [31:0]  br_data_a,  // branch comparison data 1
@@ -22,7 +19,7 @@ module branch_unit (
     output reg          br_taken    // true if branch is taken
 );
 
-always @(posedge clk) begin
+always @* begin
     if (br_en) begin
         case (funct3)
             `FUNCT3_BEQ:     // Branch if EQual
@@ -41,7 +38,7 @@ always @(posedge clk) begin
                 br_taken <= 1'b0;
         endcase
     end
-    else br_taken <= 1'b0;  // prevent latches
+    else br_taken <= 1'b0;
 end
 
 
