@@ -154,8 +154,11 @@ branch_unit branch_unit1 (
 );
 
 always @(posedge clk) begin
+    $monitor("PC <- [%h]", pc);
+
     if (!rst_n) begin
         state <= `CORE_STATE_INIT;
+        $display("==== CORE INIT ====");
     end
     else begin
         case(state)
@@ -193,12 +196,15 @@ always @(posedge clk) begin
                         // Registers are set by now, we need to enable ALU.
                         alu_en <= 0'b1;
                         state <= `CORE_STATE_MEMORY;
+                        $display("instr [ALU/ALUI]");
                     end
 
                     `OP_BRANCH: begin
                         // Registers are set by now, we need to enable BU.
                         br_en <= 0'b1;
                         state <= `CORE_STATE_MEMORY;
+                        $display("instr [BRANCH]");
+
                     end
 
                     `OP_LOAD: begin
@@ -206,6 +212,7 @@ always @(posedge clk) begin
                         mem_data_r_en <= 1'b1;
                         mem_data_r_addr <= reg_r_data_1 + imm;
                         state <= `CORE_STATE_MEMORY;
+                        $display("instr [LOAD]");
                     end
                     `OP_STORE: begin
                         // Store instructions, we need to enable the data memory write
@@ -213,6 +220,7 @@ always @(posedge clk) begin
                         mem_data_w_addr <= reg_r_data_1 + imm;
                         mem_data_w_data <= reg_r_data_2;
                         state <= `CORE_STATE_MEMORY;
+                        $display("instr [STORE]");
                     end
 
                     `OP_JAL: begin
@@ -220,6 +228,7 @@ always @(posedge clk) begin
                         // Unconditional jump, we just add the immediate value to the PC
                         pc <= pc + imm;
                         state <= `CORE_STATE_MEMORY;
+                        $display("instr [JAL]");
                     end
                     `OP_JALR: begin
                         // JALR instruction, we need to update the PC
@@ -231,28 +240,33 @@ always @(posedge clk) begin
                         pc  <= (reg_r_data_1 + imm) & 32'hFFFFFFFE;
                         reg_w_data <= (reg_r_data_1 + imm) & 32'hFFFFFFFE + 4;
                         state <= `CORE_STATE_MEMORY;
+                        $display("instr [JALR]");
                     end
 
                     `OP_LUI: begin
                         // LUI instruction, we need to update the register with an immediate value
                         reg_w_data <= imm;
                         state <= `CORE_STATE_MEMORY;
+                        $display("instr [LUI]");
                     end
                     `OP_AUIPC: begin
                         // AUIPC instruction, we need to add the immediate value to the PC
                         // and write it to the register
                         reg_w_data <= pc + imm;
                         state <= `CORE_STATE_MEMORY;
+                        $display("instr [AUIPC]");
                     end
 
                     `OP_ENVIRONMENT: begin
                         // ECALL or EBREAK instruction, for now we just halt the core
                         state <= `CORE_STATE_HALT;
+                        $display("instr [ECALL/EBREAK]");
                     end
 
                     default: begin
                         // Error state for unsupported opcodes
                         state <= `CORE_STATE_ERROR;
+                        $display("UNKNOWN INSTR OPCODE! [%h]", instr);
                     end
                 endcase
             end

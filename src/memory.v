@@ -19,6 +19,7 @@
 `define MEMORY_STATE_ALIGNMENT      2'b11   // Aliginment error
 
 module memory #(
+    parameter NAME                = "",
     parameter MEMORY_SIZE_WORDS = 1024,                     // Memory size in 32-bit words
     parameter INIT_FILE         = "",                       // Path to memory initialization file. Zero-initialized if none is provided.
     parameter ADDR_WIDTH        = $clog2(MEMORY_SIZE_WORDS) // Memory bus size. By default, the size needed to address MEMORY_SIZE_WORDS.
@@ -54,23 +55,30 @@ always @(posedge clk) begin
     // Error checking
     if (r_en && w_en)
         state <= `MEMORY_STATE_READ_WRITE;
-    else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS))
+    else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS)) begin
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-    else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS))
+        $display("mem %s read out of bounds at [%08h]", NAME, r_addr);
+    end else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS)) begin
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-    else if ((r_en) && (r_addr_offset != 2'b00))
+        $display("mem %s write out of bounds at [%08h]", NAME, w_addr);
+    end else if ((r_en) && (r_addr_offset != 2'b00)) begin
         state <= `MEMORY_STATE_ALIGNMENT;
-    else if ((w_en) && (w_addr_offset != 2'b00))
+        $display("mem %s read unaligned at [%08h]", NAME, r_addr);
+    end else if ((w_en) && (w_addr_offset != 2'b00)) begin
         state <= `MEMORY_STATE_ALIGNMENT;
+        $display("mem %s write unaligned at [%08h]", NAME, w_addr);
+    end
     
     // Memory operations
     else if (w_en) begin
         mem[w_addr_wrd] <= w_data;
         state <= `MEMORY_STATE_SUCCESS;
+        $strobe("mem %s write %0h at [%08h]", NAME, w_data, w_addr);
     end
     else if (r_en) begin
         r_data <= mem[r_addr_wrd];
         state <= `MEMORY_STATE_SUCCESS;
+        $strobe("mem %s read %0h at [%08h]", NAME, r_data, r_addr);
     end
 end
 
