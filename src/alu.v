@@ -38,23 +38,38 @@ always @* begin
     if(alu_en) begin
         case (funct3)
             `FUNCT3_ADD_SUB: begin
-                if(alt_action)      // Subtraction
+                if(alt_action) begin     // Subtraction
                     alu_res = op_a - op_b;
-                else                // Addition
+                    $display("alu %0d - %0d = %0d", op_a, op_b, alu_res);
+                end else begin           // Addition
                     alu_res = op_a + op_b;
+                    $display("alu %0d + %0d = %0d", op_a, op_b, alu_res);
+                end
             end
-            `FUNCT3_AND:            // Bitwise AND
+            `FUNCT3_AND: begin           // Bitwise AND
                 alu_res = op_a & op_b;
-            `FUNCT3_OR:             // Bitwise OR
+                $display("alu %0d & %0d = %0d", op_a, op_b, alu_res);
+            end
+            `FUNCT3_OR: begin            // Bitwise OR
                 alu_res = op_a | op_b;
-            `FUNCT3_XOR:            // Bitwise XOR
+                $display("alu %0d | %0d = %0d", op_a, op_b, alu_res);
+            end
+            `FUNCT3_XOR: begin           // Bitwise XOR
                 alu_res = op_a ^ op_b;
-            `FUNCT3_SLL:            // Shift Left Logical (fill with 0)
+                $display("alu %0d ^ %0d = %0d", op_a, op_b, alu_res);
+            end
+            `FUNCT3_SLL: begin           // Shift Left Logical (fill with 0)
                 alu_res = op_a << shamt;
-            `FUNCT3_SLT:            // Set Less Than (set to 1 if op_a < op_b)
+                $display("alu %0d << %0d = %0d", op_a, shamt, alu_res);
+            end
+            `FUNCT3_SLT: begin           // Set Less Than (set to 1 if op_a < op_b)
                 alu_res = ($signed(op_a) < $signed(op_b)) ? 32'b1 : 32'b0;
-            `FUNCT3_SLTU:           // Set Less Than Unsigned (set to 1 if op_a < op_b)
+                $display("alu %0d < %0d = %0d (signed)", op_a, op_b, alu_res);
+            end
+            `FUNCT3_SLTU: begin          // Set Less Than Unsigned (set to 1 if op_a < op_b)
                 alu_res = (op_a < op_b) ? 32'b1 : 32'b0;
+                $display("alu %0d < %0d = %0d (unsigned)", op_a, op_b, alu_res);
+            end
             default:                // Default case to prevent latches
                 alu_res = 32'b0;
         endcase

@@ -32,9 +32,11 @@ always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin: CLEAR_REG
         integer i;
         for (i = 0; i < 32; i = i + 1) reg_data[i] <= 32'h00000000; // Reset all registers to 0
+        $display("reg reset");
     end
     else if (w_en && (w_sel != 5'b00000)) begin  // Don't write to register x0
         reg_data[w_sel] <= w_data;
+        $display("reg x%02d <- %0h", w_sel, w_data);
     end
 end
 

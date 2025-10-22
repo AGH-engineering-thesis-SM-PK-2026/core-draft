@@ -31,7 +31,7 @@ wire    [31:0]  dbg_pc;
 wire    [31:0]  dbg_reg_data;
 wire    [4:0]   dbg_reg_sel;
 
-memory #(.INIT_FILE(DATA_INIT_FILE)) mem_data(
+memory #(.NAME("DATA"), .INIT_FILE(DATA_INIT_FILE)) mem_data(
     .clk(GLOBAL_CLK_IN),
     .r_en(mem_data_r_en),
     .r_addr(mem_data_r_addr),
@@ -41,7 +41,7 @@ memory #(.INIT_FILE(DATA_INIT_FILE)) mem_data(
     .w_data(mem_data_w_data)
  );
 
-memory #(.INIT_FILE(INSTR_INIT_FILE)) mem_instr(
+memory #(.NAME("PROG"), .INIT_FILE(INSTR_INIT_FILE)) mem_instr(
     .clk(GLOBAL_CLK_IN),
     .r_en(mem_instr_r_en),
     .r_addr(mem_instr_r_addr),
