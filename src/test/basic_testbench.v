@@ -9,25 +9,18 @@ always #10 clk = ~clk;
 
 initial begin
     clk = 1'b0;
-    rst_n = 1'b0;
-
+    rst_n = 1'b1;
+    
     repeat (5) @(posedge clk);
-
-    @(posedge clk) rst_n <= 1'b1;
-    repeat (100) @(posedge clk);
-
     @(posedge clk) rst_n <= 1'b0;
     repeat (5) @(posedge clk);
-
     @(posedge clk) rst_n <= 1'b1;
-    repeat (100) @(posedge clk);
-    
 end
 
 toplevel #(
     .DATA_INIT_FILE("init_data.mem"),
-    //.INSTR_INIT_FILE("init_instr.mem")
-    .INSTR_INIT_FILE("init_instr_fibo.mem")
+//    .INSTR_INIT_FILE("init_instr.mem")
+    .INSTR_INIT_FILE("init_prog_subtest.mem")
 ) top (
     .GLOBAL_CLK_IN(clk),
     .GLOBAL_RST_N(rst_n)
