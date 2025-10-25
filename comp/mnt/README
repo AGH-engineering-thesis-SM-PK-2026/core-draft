@@ -1,0 +1,23 @@
+BASIC C COMPILATION
+
+First compile your C file/s with main function:
+
+rvcc iotest.c iotest.elf
+
+Get memory-file-ready executable dump:
+
+rvdump iotest.elf
+
+What does the program do?
+
+Boot code starts:
+
+- sets up stack pointer register (sp/x2) to point to MEMEND (00002000);
+- calls main function.
+
+Your main function will then execute its code. After that it returns
+control to boot code again which doesn't do much else: loops forever.
+
+Why .elf extension?
+
+Mostly for gitignore purposes.
