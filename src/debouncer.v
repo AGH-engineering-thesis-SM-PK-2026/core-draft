@@ -1,49 +1,33 @@
-/*****************************************************************************
- *  Author: Piotr Kadziela
- *  Description:
- *      A generic debouncer module for mechanical switches. Uses internal 
- *      prescaler.
- *****************************************************************************/
+`timescale 1ns / 1ps
 
-module debouncer  #(
-    parameter PRESCALER_DIV       = 10000,   // prescaler division factor (assuming clk is in kHz, 10000 = one sample for every 10ms)
-    parameter PRESCALER_WIDTH     = $clog2(PRESCALER_DIV),
-    parameter CONSECUTIVE_SAMPLES = 16,       // number of consecutive stable samples needed to change output state
+// TODO
+// Szymon Miękina - 06.11.2025
+
+module debounce #(
+    PREBITS = 10,
+    FILBITS = 4
 ) (
-    input               clk,
-    input               rst_n,
-
-    input               sw_in,      // raw input from the mechanical switch
-    output reg          sw_out,     // debounced output
-    output reg          sw_pulse    // debounced output (one clock pulse on positive edge of sw_out)
+    input wire n_rst,
+    input wire clk,
+    input wire in,
+    output reg out
 );
 
-reg     [CONSECUTIVE_SAMPLES-1:0]  shift_reg;
-reg     [PRESCALER_WIDTH-1:0]      prescaler_cnt;
+reg [PREBITS - 1:0] precnt;
+reg [FILBITS - 1:0] filter;
 
-always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        shift_reg <= 16'b0;
-        sw_out <= 1'b0;
+always @(posedge clk) begin
+    precnt <= precnt + 1'b1;
+    out <= &filter;
+    if (&precnt) begin 
+        filter <= {filter[FILBITS - 2:0], in};
+        precnt <= 1'b0;
     end
-    else begin
-        if (prescaler_cnt == PRESCALER_DIV - 1) begin
-            prescaler_cnt <= 0;
-
-            shift_reg <= {shift_reg[CONSECUTIVE_SAMPLES-2:0], sw_in};
-
-            if (shift_reg == {CONSECUTIVE_SAMPLES{1'b1}})
-                sw_out <= 1'b1;
-                sw_pulse <= ~sw_out;    // only high on rising edge of sw_out
-            else if (shift_reg == {CONSECUTIVE_SAMPLES{1'b0}})
-                sw_out <= 1'b0;
-                sw_pulse <= 1'b0;
-        end
-        else begin
-            prescaler_cnt <= prescaler_cnt + 1;
+    
+    if (!n_rst) begin
+        filter <= 1'b0;
+        out <= 1'b0;
     end
 end
-
-
 
 endmodule

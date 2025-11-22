@@ -63,15 +63,16 @@ memory #(.NAME("DATA"), .INIT_FILE("init_data.mem")) mem_data(
     .r_data(mem_data_r_data),
     .w_en(mem_data_w_en),
     .w_addr(w_addr - 32'h1000),
-    .w_data(w_data)
+    .w_data(w_data),
+    .state()
 );
 
 // gpio a peripheral - also apply offset
 gpio gpio_a(
     .clk(clk),
-    .r_en(gpio_a_r_en),
-    .r_addr(r_addr - 32'h400),
-    .r_data(gpio_a_r_data),
+//    .r_en(gpio_a_r_en),
+//    .r_addr(r_addr - 32'h400),
+//    .r_data(gpio_a_r_data),
     .w_en(gpio_a_w_en),
     .w_addr(w_addr - 32'h400),
     .w_data(w_data)
