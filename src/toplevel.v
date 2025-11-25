@@ -39,7 +39,7 @@ memory #(.NAME("DATA"), .INIT_FILE(DATA_INIT_FILE)) mem_data(
     .w_en(mem_data_w_en),
     .w_addr(mem_data_w_addr),
     .w_data(mem_data_w_data)
- );
+);
 
 memory #(.NAME("PROG"), .INIT_FILE(INSTR_INIT_FILE)) mem_instr(
     .clk(GLOBAL_CLK_IN),
@@ -71,9 +71,5 @@ core cpu1(
     .dbg_reg_data(dbg_reg_data),
     .dbg_reg_sel(dbg_reg_sel)
 );
-
-
-
-
 
 endmodule

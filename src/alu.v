@@ -16,7 +16,7 @@ module alu (
     input       [6:0]   funct7,         // 7-bit function code
 
     input               alu_en,         // ALU enable (to prevent overwriting result)
-    input               src_sel,        // source selection for second operand: 0 - rs2, 1 - immediate
+    input               src_sel,        // source selection for second operand: 1 - rs2, 0 - immediate
     input       [31:0]  reg_data_1,     // first operand
     input       [31:0]  reg_data_2,     // second operand (rs2)
     input       [31:0]  immediate,      // second operand (immediate value)
@@ -30,9 +30,9 @@ wire    [4:0]   shamt;          // shift amount - lower 5 bits of the second ope
 wire            alt_action;     // alternate action for current funct3, eg. sub instead of add
 
 assign op_a = reg_data_1;
-assign op_b = (src_sel) ? reg_data_2 : immediate;
+assign op_b = src_sel ? reg_data_2 : immediate;
 assign shamt = op_b[4:0];
-assign alt_action = (!src_sel && funct7 == `FUNCT7_SUB_SRA) ? 1'b1 : 1'b0;
+assign alt_action = (src_sel && funct7 == `FUNCT7_SUB_SRA) ? 1'b1 : 1'b0;
 
 always @* begin
     if(alu_en) begin

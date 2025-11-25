@@ -80,7 +80,7 @@ wire    [2:0]   funct3;             // function code (3 bit)
 wire    [4:0]   rs1;                // source register 1  
 wire    [4:0]   rs2;                // source register 2
 wire    [6:0]   funct7;             // function code (7 bit)
-wire            alu_src_sel;        // source select for ALU (0 - rs2, 1 - immediate)
+wire            alu_src_sel;        // source select for ALU (1 - rs2, 0 - immediate)
 
 assign opcode       = instr[6:0];
 assign rd           = instr[11:7];
@@ -165,11 +165,25 @@ always @(posedge clk) begin
             `CORE_STATE_INIT: begin
                 // Reset the program counter
                 pc <= 32'h00000000;
+                state <= `CORE_STATE_FETCH;
 
                 // Prepare for fetching the first instruction
                 mem_instr_r_en <= 1'b1;
-
-                state <= `CORE_STATE_FETCH;
+                
+                // Initialize CPU to a known state
+                mem_instr_w_en <= 1'b0;
+                mem_instr_w_addr <= 1'b0;
+                mem_instr_w_data <= 1'b0;
+                mem_data_r_en <= 1'b0;
+                mem_data_r_addr <= 1'b0;
+                mem_data_w_en <= 1'b0;
+                mem_data_w_addr <= 1'b0;
+                mem_data_w_data <= 1'b0;
+                instr <= 1'b0;
+                reg_w_data <= 1'b0;
+                reg_w_en <= 1'b0;
+                alu_en <= 1'b0;
+                br_en <= 1'b0;
             end
 
             `CORE_STATE_FETCH: begin
@@ -194,14 +208,14 @@ always @(posedge clk) begin
                 case (opcode)
                     `OP_ALU, `OP_ALUI: begin
                         // Registers are set by now, we need to enable ALU.
-                        alu_en <= 0'b1;
+                        alu_en <= 1'b1;
                         state <= `CORE_STATE_MEMORY;
                         $display("instr [ALU/ALUI]");
                     end
 
                     `OP_BRANCH: begin
                         // Registers are set by now, we need to enable BU.
-                        br_en <= 0'b1;
+                        br_en <= 1'b1;
                         state <= `CORE_STATE_MEMORY;
                         $display("instr [BRANCH]");
 
@@ -226,7 +240,9 @@ always @(posedge clk) begin
                     `OP_JAL: begin
                         // J-type instructions, we need to update the PC
                         // Unconditional jump, we just add the immediate value to the PC
-                        pc <= pc + imm;
+                        // imm - 4 because otherwise we would skip instruction at pc + imm
+                        pc <= pc + imm - 4'h4;
+                        reg_w_data <= pc + 4'h4;
                         state <= `CORE_STATE_MEMORY;
                         $display("instr [JAL]");
                     end
@@ -237,7 +253,7 @@ always @(posedge clk) begin
                         //   - set the least significant bit to 0
                         //   - set the PC to the result
                         //   - set the link register to PC + 4
-                        pc  <= (reg_r_data_1 + imm) & 32'hFFFFFFFE;
+                        pc  <= (reg_r_data_1 + imm - 4'h4) & 32'hFFFFFFFE;
                         reg_w_data <= (reg_r_data_1 + imm) & 32'hFFFFFFFE + 4;
                         state <= `CORE_STATE_MEMORY;
                         $display("instr [JALR]");
@@ -289,7 +305,7 @@ always @(posedge clk) begin
                         reg_w_data <= mem_data_r_data;
                         reg_w_en <= 1'b1;
                     end
-                    `OP_JALR, `OP_LUI, `OP_AUIPC: begin
+                    `OP_JAL, `OP_JALR, `OP_LUI, `OP_AUIPC: begin
                         // JALR, LUI and AUIPC instructions, we need to write the result back to the register file.
                         // The data was already prepared in the reg_w_data during the EXECUTE stage.
                         reg_w_en <= 1'b1;

@@ -53,9 +53,10 @@ assign w_addr_offset    = w_addr[1:0];
 
 always @(posedge clk) begin
     // Error checking
-    if (r_en && w_en)
+    if (r_en && w_en) begin
         state <= `MEMORY_STATE_READ_WRITE;
-    else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS)) begin
+        $display("mem read and write at the same time");
+    end else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS)) begin
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
         $display("mem %s read out of bounds at [%08h]", NAME, r_addr);
     end else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS)) begin
@@ -91,6 +92,14 @@ initial begin
         integer i;
         for (i = 0; i < MEMORY_SIZE_WORDS; i = i + 1) mem[i] <= 32'h00000000;
     end
+end
+
+integer j;
+initial begin
+    #100000;
+    for (j = 0; j < 32; j = j + 8)
+        $display("%08x %08x %08x %08x  %08x %08x %08x %08x", mem[0+j], mem[1+j], mem[2+j], mem[3+j], mem[4+j], mem[5+j], mem[6+j], mem[7+j]);
+    
 end
 
 endmodule
