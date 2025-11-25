@@ -15,10 +15,8 @@
  *****************************************************************************/
 
 // TODO:
-// - ECALL and EBREAK instructions
 // - FENCE instruction
 // - Load/Store half word and byte
-// - CLOCK ENABLE
 
 `include "opcodes.vh"
 
@@ -30,13 +28,13 @@
 `define CORE_STATE_WRITEBACK    4'b0101
 `define CORE_STATE_HALT         4'b0110
 `define CORE_STATE_ERROR        4'b0111
-`define TMP_STATE_FETCH_DELAYED 4'b1001
 
 module core (
     input               clk,                
     input               rst_n,              // reset on low
     input               clk_enable,         // 
     output              cycle_end,          // high on last tick of the cycle (WB or INIT stage)
+    output reg          breakpoint_hit,     // high when an ebreak instruction is executed
 
     // Instruction memory interface
     output reg          mem_instr_r_en,     // read enable
@@ -150,7 +148,7 @@ branch_unit branch_unit1 (
     .br_taken(br_taken)
 );
 
-always @(posedge clk or negedge rst_n) begin
+always @(posedge clk) begin
     $monitor("PC <- [%h]", pc);
 
     if (!rst_n) begin
@@ -170,6 +168,9 @@ always @(posedge clk or negedge rst_n) begin
         br_en <= 1'b0;
         state <= `CORE_STATE_INIT;
         $display("==== CORE RESET ====");
+    end
+    else if (!clk_enable) begin
+        // Do nothing when core is halted
     end
     else begin
         case(state)
@@ -250,7 +251,7 @@ always @(posedge clk or negedge rst_n) begin
                         //   - set the least significant bit to 0
                         //   - set the PC to the result
                         //   - set the link register to PC + 4
-                        pc  <= (reg_r_data_1 + imm - 4'h4) & 32'hFFFFFFFE;
+                        pc <= (reg_r_data_1 + imm - 4'h4) & 32'hFFFFFFFE;
                         reg_w_data <= (reg_r_data_1 + imm) & 32'hFFFFFFFE + 4;
                         state <= `CORE_STATE_MEMORY;
                         $display("instr [JALR]");
@@ -271,9 +272,24 @@ always @(posedge clk or negedge rst_n) begin
                     end
 
                     `OP_ENVIRONMENT: begin
-                        // ECALL or EBREAK instruction, for now we just halt the core
-                        state <= `CORE_STATE_HALT;
-                        $display("instr [ECALL/EBREAK]");
+                        case (imm)
+                            `IMM_ENV_EBREAK: begin
+                                // EBREAK instruction - enter halt state
+                                breakpoint_hit <= 1'b1;
+                                state <= `CORE_STATE_MEMORY;
+                                $display("instr [EBREAK] - Breakpoint hit");
+                            end
+                            `IMM_ENV_ECALL: begin
+                                // ECALL instruction - in this implementation we just jump to 0x0
+                                pc <= 32'h00000000 - 4;
+                                state <= `CORE_STATE_MEMORY;
+                                $display("instr [ECALL] - JUMP TO 0x0");
+                            end
+                            default: begin
+                                state <= `CORE_STATE_ERROR;
+                                $display("UNKNOWN ENVIRONMENT INSTR! [%h]", instr);
+                            end
+                        endcase
                     end
 
                     default: begin
@@ -286,7 +302,8 @@ always @(posedge clk or negedge rst_n) begin
 
             `CORE_STATE_MEMORY: begin 
                 // Nothing to do here - we just wait for memory operations to complete.
-                // In case of any other instructions, we just pass through this state.
+                // If a breakpoint was hit, we remove the flag now.
+                breakpoint_hit <= 1'b0;
                 state <= `CORE_STATE_WRITEBACK;
             end
 

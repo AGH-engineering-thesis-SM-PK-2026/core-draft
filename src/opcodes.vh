@@ -42,8 +42,8 @@
 // JAL          J       OP_JAL          N/A             N/A
 // JALR         I       OP_JALR         FUNCT3_EMPTY    N/A
 //                                                      
-// ECALL        I       OP_ENVIRONMENT  FUNCT3_EMPTY    N/A
-// EBREAK       I       OP_ENVIRONMENT  FUNCT3_EMPTY    N/A
+// ECALL        I       OP_ENVIRONMENT  FUNCT3_EMPTY    N/A             imm[0:11] = 12'b000000000000
+// EBREAK       I       OP_ENVIRONMENT  FUNCT3_EMPTY    N/A             imm[0:11] = 12'b000000000001
 //                                                      
 // LUI          U       OP_LUI          N/A             N/A
 // AUIPC        U       OP_AUIPC        N/A             N/A
@@ -98,6 +98,10 @@
 `define FUNCT3_BGE      3'b101      // Branch if Greater than or Equal
 `define FUNCT3_BLTU     3'b110      // Branch if Less Than unsigned
 `define FUNCT3_BGEU     3'b111      // Branch if Greater than or Equal Unsigned
+
+// imm codes for OP_ENVIRONMENT
+`define IMM_ENV_ECALL   12'b000000000000  // Environment CALL
+`define IMM_ENV_EBREAK  12'b000000000001  // Environment BREAK
 
 // instruction type matching patterns
 `define OPCODE_TYPE_R   `OP_ALU

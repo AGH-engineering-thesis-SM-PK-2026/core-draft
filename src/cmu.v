@@ -10,82 +10,87 @@
  *          trigger signal.
  *      - Single cycle mode: The core executes one step (either FE, DE, EX, 
  *          MEM or WB) per external trigger signal.
- *  Defaut mode is normal operation mode. When clock_supress is high, the core
- *  will stop operation until triggered by either trig_step or trig_cycle.
+ *  Defaut mode is normal operation mode.
+ *  When halt signal is received, the core finishes the current cycle and
+ *  enters await trigger mode. Halt signal may be generated internally 
+ *  (e.g. by a breakpoint) or externally (e.g. by a debugger).
+ *  When in await trigger state, the core will wait until a trigger signal is 
+ *  received (either single step, single cycle or unhalt).
+ *  Holding the clock_supress high when the core is halted will cause CMU to 
+ *  ignore any triggers and keep the core halted.
  *
- *  INPUTS SHOULD BE DEBOUNCED AND NOT LONGER THAN ONE CLOCK CYCLE WIDE!
+ *  TRIG INPUTS SHOULD BE DEBOUNCED AND NOT LONGER THAN ONE CLOCK CYCLE WIDE!
  *****************************************************************************/
 
-`define CMU_STATE_RUNNING       2'b00   // normal operation mode
-`define CMU_STATE_STEP          2'b01   // single step in progress
-`define CMU_STATE_CYCLE         2'b10   // single cycle in progress
-`define CMU_STATE_AWAIT_TRIG    2'b11   // waiting for trigger
+`define CMU_STATE_RUNNING       0       // normal operation mode
+`define CMU_STATE_FINISH_CYCLE  1       // waiting to finish current clock cycle before halting
+`define CMU_STATE_HALTED        2       // the core has just been halted. Send debug trigger and wait for one cycle (debug interface may want to supress clock)
+`define CMU_STATE_AWAIT_TRIG    3       // halted, waiting for trigger
+`define CMU_STATE_STEP          4       // single step in progress
 
-module cmu (
+module cmu #(
+    parameter INITIAL_STATE = `CMU_STATE_RUNNING
+) (
     input               clk_in,
     input               rst_n,
 
-    input               clock_supress,  // when high, the core is stopped
-    input               trig_step,     // trigger single step (one clock tick)
-    input               trig_cycle,    // trigger single cycle (one full instruction)
-
     input               cycle_end,      // input signal from the core indicating the end of a full instruction cycle
 
-    output              state_out,      // current CMU state
-    output reg          clk_enable      // output clock to the core
+    input               trig_halt,      // halt the core (enter await trigger mode on pulse)
+    input               clock_supress,  // suppress any triggers
+
+    input               trig_unhalt,    // unhalt the core (enter normal operation mode on pulse)
+    input               trig_cycle,     // trigger single cycle (one full instruction)
+    input               trig_step,      // trigger single step (one clock tick)
+
+    output              debug_trig,     // output debug trigger on halt to notify debug interface
+    output              clk_enable      // output clock to the core
 );
 
-state reg     [1:0]   state;
+reg [2:0]   state;
 
-assign state_out = state;
+assign debug_trig = (state == `CMU_STATE_HALTED);
+assign clk_enable = (state == `CMU_STATE_RUNNING) || (state == `CMU_STATE_FINISH_CYCLE) || (state == `CMU_STATE_STEP);
 
-always @(posedge clk_in or posedge rst_n) begin
+always @(posedge clk_in) begin
     if (!rst_n) begin
-        
+        state <= INITIAL_STATE;
     end
     else begin
-        if (!clock_supress) begin
-            state <= `CMU_STATE_RUNNING;
-            clk_enable <= 1'b1;
-        end
-        else begin
-            case (state)
-                `CMU_STATE_RUNNING: begin
-                    // Finish the current cycle and await trigger
-                    state <= `CMU_STATE_CYCLE;
-                    clk_enable <= 1'b0;
+        case (state)
+            `CMU_STATE_RUNNING: begin
+                if (trig_halt)
+                    state <= `CMU_STATE_FINISH_CYCLE;
+            end
+            `CMU_STATE_FINISH_CYCLE: begin
+                // Wait until the current clock cycle is finished
+                if (cycle_end) begin
+                    state <= `CMU_STATE_HALTED;
                 end
-                `CMU_STATE_STEP: begin
-                    // Single step completed
-                    state <= `CMU_STATE_AWAIT_TRIG;
-                    clk_enable <= 1'b0;
-                end
-                `CMU_STATE_CYCLE: begin
-                    // Keep running until cycle ends
-                    if (cycle_end) begin
-                        // Full cycle completed
-                        state <= `CMU_STATE_AWAIT_TRIG;
-                        clk_enable <= 1'b0;
+            end
+            `CMU_STATE_HALTED: begin
+                // After halting, wait for one clock cycle to allow debug interface to react
+                state <= `CMU_STATE_AWAIT_TRIG;
+            end
+            `CMU_STATE_AWAIT_TRIG: begin
+                if (!clock_supress) begin
+                    if (trig_unhalt) begin
+                        state <= `CMU_STATE_RUNNING;
                     end
-                end
-                `CMU_STATE_AWAIT_TRIG: begin
-                    // Do nothing until triggered
-                    clk_enable <= 1'b0;
-                    if (trig_step) begin
+                    else if (trig_step) begin
                         state <= `CMU_STATE_STEP;
-                        clk_enable <= 1'b1;
                     end
                     else if (trig_cycle) begin
-                        state <= `CMU_STATE_CYCLE;
-                        clk_enable <= 1'b1;
+                        state <= `CMU_STATE_FINISH_CYCLE;
                     end
                 end
-            endcase
-        end
+            end
+            `CMU_STATE_STEP: begin
+                // After one clock cycle, return to await trigger state
+                state <= `CMU_STATE_AWAIT_TRIG;
+            end
+        endcase
     end
 end
-
-
-
 
 endmodule
