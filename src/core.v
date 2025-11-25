@@ -153,12 +153,26 @@ branch_unit branch_unit1 (
     .br_taken(br_taken)
 );
 
-always @(posedge clk) begin
+always @(posedge clk or negedge rst_n) begin
     $monitor("PC <- [%h]", pc);
 
     if (!rst_n) begin
+        // Initialize CPU to a known state
+        mem_instr_w_en <= 1'b0;
+        mem_instr_w_addr <= 1'b0;
+        mem_instr_w_data <= 1'b0;
+        mem_data_r_en <= 1'b0;
+        mem_data_r_addr <= 1'b0;
+        mem_data_w_en <= 1'b0;
+        mem_data_w_addr <= 1'b0;
+        mem_data_w_data <= 1'b0;
+        instr <= 1'b0;
+        reg_w_data <= 1'b0;
+        reg_w_en <= 1'b0;
+        alu_en <= 1'b0;
+        br_en <= 1'b0;
         state <= `CORE_STATE_INIT;
-        $display("==== CORE INIT ====");
+        $display("==== CORE RESET ====");
     end
     else begin
         case(state)
@@ -169,21 +183,7 @@ always @(posedge clk) begin
 
                 // Prepare for fetching the first instruction
                 mem_instr_r_en <= 1'b1;
-                
-                // Initialize CPU to a known state
-                mem_instr_w_en <= 1'b0;
-                mem_instr_w_addr <= 1'b0;
-                mem_instr_w_data <= 1'b0;
-                mem_data_r_en <= 1'b0;
-                mem_data_r_addr <= 1'b0;
-                mem_data_w_en <= 1'b0;
-                mem_data_w_addr <= 1'b0;
-                mem_data_w_data <= 1'b0;
-                instr <= 1'b0;
-                reg_w_data <= 1'b0;
-                reg_w_en <= 1'b0;
-                alu_en <= 1'b0;
-                br_en <= 1'b0;
+                $display("==== CORE INIT ====");
             end
 
             `CORE_STATE_FETCH: begin
@@ -341,12 +341,6 @@ always @(posedge clk) begin
             end
         endcase
     end
-end
-
-initial begin
-    state <= `CORE_STATE_INIT;
-    pc <= 32'b0000;
-    instr <= 32'b0;
 end
 
 initial begin
