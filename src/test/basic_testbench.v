@@ -9,19 +9,12 @@ always #10 clk = ~clk;
 
 initial begin
     clk = 1'b0;
-    rst_n = 1'b0;
-
+    rst_n = 1'b1;
+    
     repeat (5) @(posedge clk);
-
-    @(posedge clk) rst_n <= 1'b1;
-    repeat (100) @(posedge clk);
-
     @(posedge clk) rst_n <= 1'b0;
     repeat (5) @(posedge clk);
-
     @(posedge clk) rst_n <= 1'b1;
-    repeat (100) @(posedge clk);
-    
 end
 
 toplevel #(

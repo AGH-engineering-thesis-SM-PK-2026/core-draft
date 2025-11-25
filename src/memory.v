@@ -19,6 +19,7 @@
 `define MEMORY_STATE_ALIGNMENT      2'b11   // Aliginment error
 
 module memory #(
+    parameter NAME                = "",
     parameter MEMORY_SIZE_WORDS = 1024,                     // Memory size in 32-bit words
     parameter INIT_FILE         = "",                       // Path to memory initialization file. Zero-initialized if none is provided.
     parameter ADDR_WIDTH        = $clog2(MEMORY_SIZE_WORDS) // Memory bus size. By default, the size needed to address MEMORY_SIZE_WORDS.
@@ -52,25 +53,33 @@ assign w_addr_offset    = w_addr[1:0];
 
 always @(posedge clk) begin
     // Error checking
-    if (r_en && w_en)
+    if (r_en && w_en) begin
         state <= `MEMORY_STATE_READ_WRITE;
-    else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS))
+        $display("mem read and write at the same time");
+    end else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS)) begin
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-    else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS))
+        $display("mem %s read out of bounds at [%08h]", NAME, r_addr);
+    end else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS)) begin
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-    else if ((r_en) && (r_addr_offset != 2'b00))
+        $display("mem %s write out of bounds at [%08h]", NAME, w_addr);
+    end else if ((r_en) && (r_addr_offset != 2'b00)) begin
         state <= `MEMORY_STATE_ALIGNMENT;
-    else if ((w_en) && (w_addr_offset != 2'b00))
+        $display("mem %s read unaligned at [%08h]", NAME, r_addr);
+    end else if ((w_en) && (w_addr_offset != 2'b00)) begin
         state <= `MEMORY_STATE_ALIGNMENT;
+        $display("mem %s write unaligned at [%08h]", NAME, w_addr);
+    end
     
     // Memory operations
     else if (w_en) begin
         mem[w_addr_wrd] <= w_data;
         state <= `MEMORY_STATE_SUCCESS;
+        $strobe("mem %s write %0h at [%08h]", NAME, w_data, w_addr);
     end
     else if (r_en) begin
         r_data <= mem[r_addr_wrd];
         state <= `MEMORY_STATE_SUCCESS;
+        $strobe("mem %s read %0h at [%08h]", NAME, r_data, r_addr);
     end
 end
 
@@ -83,6 +92,14 @@ initial begin
         integer i;
         for (i = 0; i < MEMORY_SIZE_WORDS; i = i + 1) mem[i] <= 32'h00000000;
     end
+end
+
+integer j;
+initial begin
+    #100000;
+    for (j = 0; j < 32; j = j + 8)
+        $display("%08x %08x %08x %08x  %08x %08x %08x %08x", mem[0+j], mem[1+j], mem[2+j], mem[3+j], mem[4+j], mem[5+j], mem[6+j], mem[7+j]);
+    
 end
 
 endmodule
