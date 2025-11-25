@@ -38,8 +38,8 @@
 module core (
     input               clk,                
     input               rst_n,              // reset on low
-    input               clk_enable,         
-    output              cycle_end,          // high on last tick of the step step (WB or INIT stage)
+    input               clk_enable,         // 
+    output              cycle_end,          // high on last tick of the cycle (WB or INIT stage)
 
     // Instruction memory interface
     output reg          mem_instr_r_en,     // read enable
@@ -66,21 +66,21 @@ module core (
     output      [31:0]  dbg_reg_data        // debug reg data
 );
 
-reg     [3:0]   state;          // state of the core
-reg     [31:0]  pc;             // program counter
+reg     [3:0]   state;              // state of the core
+reg     [31:0]  pc;                 // program counter
 
-assign mem_instr_r_addr = pc;   // We read from the instruction memory only at the PC address
-assign cycle_end = (state == `CORE_STATE_WRITEBACK || state == `CORE_STATE_INIT) ? 1'b1 : 1'b0;
+assign mem_instr_r_addr = pc;       // We read from the instruction memory only at the PC address
+assign cycle_end = (state == `CORE_STATE_WRITEBACK || state == `CORE_STATE_INIT);
 
-reg     [31:0]  instr;          // buffer for the currently executed instruction
+reg     [31:0]  instr;              // buffer for the currently executed instruction
 
-wire    [6:0]   opcode;         // opcode
-wire    [4:0]   rd;             // destination register
-wire    [2:0]   funct3;         // function code (3 bit)
-wire    [4:0]   rs1;            // source register 1  
-wire    [4:0]   rs2;            // source register 2
-wire    [6:0]   funct7;         // function code (7 bit)
-wire            alu_src_sel;    // source select for ALU (0 - rs2, 1 - immediate)
+wire    [6:0]   opcode;             // opcode
+wire    [4:0]   rd;                 // destination register
+wire    [2:0]   funct3;             // function code (3 bit)
+wire    [4:0]   rs1;                // source register 1  
+wire    [4:0]   rs2;                // source register 2
+wire    [6:0]   funct7;             // function code (7 bit)
+wire            alu_src_sel;        // source select for ALU (0 - rs2, 1 - immediate)
 
 assign opcode       = instr[6:0];
 assign rd           = instr[11:7];
@@ -88,7 +88,7 @@ assign funct3       = instr[14:12];
 assign rs1          = instr[19:15];
 assign rs2          = instr[24:20];
 assign funct7       = instr[31:25];
-assign alu_src_sel  = opcode[5]; // differentiate between R-type and I-type instructions
+assign alu_src_sel  = opcode[5];    // differentiate between R-type and I-type instructions
 
 // regfile interface
 wire    [31:0]  reg_r_data_1;       // data from the first register
@@ -97,15 +97,15 @@ reg     [31:0]  reg_w_data;         // data to write
 reg             reg_w_en;           // write enable
 
 // imm_decoder interface
-wire    [31:0]  imm;            // immediate value from imm_decoder
+wire    [31:0]  imm;                // immediate value from imm_decoder
 
 // ALU interface
-reg             alu_en;         // ALU enable
-wire    [31:0]  alu_res;        // result of the ALU operation
+reg             alu_en;             // ALU enable
+wire    [31:0]  alu_res;            // result of the ALU operation
 
 // Branch Unit interface
-reg             br_en;          // branch enable
-wire            br_taken;       // branch taken
+reg             br_en;              // branch enable
+wire            br_taken;           // branch taken
 
 assign dbg_state = state;
 assign dbg_pc = pc;
@@ -294,11 +294,11 @@ always @(posedge clk) begin
 
                 // Prepare for fetching the next instruction
                 if (opcode == `OP_BRANCH && br_taken) begin
-                    // Branch taken, we need to update the PC
+                    // If a branch has been taken we load the jump address into the PC
                     pc <= pc + imm;
                 end
                 else begin
-                    // No branch taken, we just increment the PC
+                    // In other cases we just increment the PC by 4
                     pc <= pc + 4;
                 end
                 mem_instr_r_en <= 1'b1;
