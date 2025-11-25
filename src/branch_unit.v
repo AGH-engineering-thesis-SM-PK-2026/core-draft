@@ -5,9 +5,6 @@
  *      Branch Unit for RISC-V core.
  *****************************************************************************/
 
-// TODO:
-// - Consider adding states for branching operations (error handling)
-
 `include "opcodes.vh"
 
 module branch_unit (

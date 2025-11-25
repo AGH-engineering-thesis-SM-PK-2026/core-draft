@@ -15,12 +15,9 @@
  *****************************************************************************/
 
 // TODO:
-// - Correcly implement reseting in all of the modules
 // - ECALL and EBREAK instructions
 // - FENCE instruction
-// - interrupts
 // - Load/Store half word and byte
-// - check for correct endianness handling
 // - CLOCK ENABLE
 
 `include "opcodes.vh"

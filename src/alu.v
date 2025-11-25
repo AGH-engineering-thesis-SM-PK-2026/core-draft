@@ -5,10 +5,6 @@
  *      Arithmetic Logic Unit (ALU) for RISC-V core.
  *****************************************************************************/
 
-// TODO:
-// - Add states for ALU operations (error handling)
-// - Check for correct handling of arguments (eg. shift amounts, etc.)
-
 `include "opcodes.vh"
 
 module alu (
