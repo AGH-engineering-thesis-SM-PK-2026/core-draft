@@ -16,7 +16,7 @@
 
 // TODO:
 // - FENCE instruction
-// - Load/Store half word and byte
+// - Load half word and byte
 
 `include "opcodes.vh"
 
@@ -38,12 +38,13 @@ module core (
 
     // Instruction memory interface
     output reg          mem_instr_r_en,     // read enable
-    output      [31:0]  mem_instr_r_addr,   // 32-bit address
+    output      [31:0]  mem_instr_r_addr,   // 32-bit address, hardwired to PC
     input       [31:0]  mem_instr_r_data,   // 32-bits of data
 
-    output reg          mem_instr_w_en,     // write enable
-    output reg  [31:0]  mem_instr_w_addr,   // 32-bit address, hardwired to PC
-    output reg  [31:0]  mem_instr_w_data,   // 32-bits of data
+    output reg          mem_instr_w_en,     // unused
+    output reg  [31:0]  mem_instr_w_addr,   // unused
+    output reg  [31:0]  mem_instr_w_data,   // unused
+    output reg  [3:0]   mem_instr_w_strb,   // unused
 
     // Data memory interface
     output reg          mem_data_r_en,      // read enable
@@ -53,6 +54,7 @@ module core (
     output reg          mem_data_w_en,      // write enable
     output reg  [31:0]  mem_data_w_addr,    // 32-bit address
     output reg  [31:0]  mem_data_w_data,    // 32-bits of data
+    output reg  [3:0]   mem_data_w_strb,    // strobe - which bytes are to be written
 
     // Debug interface, all the outputs are hardwired to the core parts
     output      [3:0]   dbg_state,          // state of the core
@@ -231,6 +233,15 @@ always @(posedge clk) begin
                         mem_data_w_en <= 1'b1;
                         mem_data_w_addr <= reg_r_data_1 + imm;
                         mem_data_w_data <= reg_r_data_2;
+                        case (funct3)
+                            `FUNCT3_SB: mem_data_w_strb <= 4'b0001; // Store Byte
+                            `FUNCT3_SH: mem_data_w_strb <= 4'b0011; // Store Half-word
+                            `FUNCT3_SW: mem_data_w_strb <= 4'b1111; // Store Word
+                            default: begin
+                                state <= `CORE_STATE_ERROR;
+                                $display("UNKNOWN STORE INSTR! [%h]", instr);
+                            end
+                        endcase
                         state <= `CORE_STATE_MEMORY;
                         $display("instr [STORE]");
                     end
@@ -333,6 +344,7 @@ always @(posedge clk) begin
                 // Memory operations, ALU and BU are done by now, we can disable them
                 mem_data_r_en <= 1'b0;
                 mem_data_w_en <= 1'b0;
+                mem_data_w_strb <= 4'b0000;
                 alu_en <= 1'b0;
                 br_en <= 1'b0;
 
