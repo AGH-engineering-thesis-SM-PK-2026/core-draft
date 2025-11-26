@@ -154,199 +154,169 @@ branch_unit branch_unit1 (
 );
 
 always @(posedge clk) begin
-//    $monitor("PC <- [%h]", pc);
+    case(state)
+        `CORE_STATE_INIT: begin
+            // Reset the program counter
+            pc <= 32'h00000000;
+            state <= `CORE_STATE_FETCH;
 
-    if (!rst_n) begin
-        state <= `CORE_STATE_INIT;
-//        $display("==== CORE INIT ====");
-    end
-    else begin
-        case(state)
-            `CORE_STATE_INIT: begin
-                // Reset the program counter
-                pc <= 32'h00000000;
-                state <= `CORE_STATE_FETCH;
+            // Prepare for fetching the first instruction
+            mem_instr_r_en <= 1'b1;
+            
+            // Initialize CPU to a known state
+            mem_instr_w_en <= 1'b0;
+            mem_instr_w_addr <= 1'b0;
+            mem_instr_w_data <= 1'b0;
+            mem_data_r_en <= 1'b0;
+            mem_data_r_addr <= 1'b0;
+            mem_data_w_en <= 1'b0;
+            mem_data_w_addr <= 1'b0;
+            mem_data_w_data <= 1'b0;
+            instr <= 1'b0;
+            reg_w_data <= 1'b0;
+            reg_w_en <= 1'b0;
+            alu_en <= 1'b0;
+            br_en <= 1'b0;
+        end
+        
+        `CORE_STATE_FETCH: begin
+            // Register file has finished reading the registers by now.
+            // We can also disable instruction memory read, as we will get the data after this cycle.
+            mem_instr_r_en <= 1'b0;
+            reg_w_en <= 1'b0;
 
-                // Prepare for fetching the first instruction
-                mem_instr_r_en <= 1'b1;
-                
-                // Initialize CPU to a known state
-                mem_instr_w_en <= 1'b0;
-                mem_instr_w_addr <= 1'b0;
-                mem_instr_w_data <= 1'b0;
-                mem_data_r_en <= 1'b0;
-                mem_data_r_addr <= 1'b0;
-                mem_data_w_en <= 1'b0;
-                mem_data_w_addr <= 1'b0;
-                mem_data_w_data <= 1'b0;
-                instr <= 1'b0;
-                reg_w_data <= 1'b0;
-                reg_w_en <= 1'b0;
-                alu_en <= 1'b0;
-                br_en <= 1'b0;
-            end
-
-            `CORE_STATE_FETCH: begin
-                // Register file has finished reading the registers by now.
-                // We can also disable instruction memory read, as we will get the data after this cycle.
-                mem_instr_r_en <= 1'b0;
-                reg_w_en <= 1'b0;
-
-                state <= `CORE_STATE_DECODE;
-            end
-
-            `CORE_STATE_DECODE: begin
-                // We can now write the imem response into the instruction register.
-                instr <= mem_instr_r_data;
-                // Decoding is now handled by the imm_decoder.
-                // Registers are being automaticly read from the register file as well.
-                // We need to give this cycle for the regfile and imm_decoder to finish.
-                state <= `CORE_STATE_EXECUTE;
-            end
-
-            `CORE_STATE_EXECUTE: begin
-                case (opcode)
-                    `OP_ALU, `OP_ALUI: begin
-                        // Registers are set by now, we need to enable ALU.
-                        alu_en <= 1'b1;
-                        state <= `CORE_STATE_MEMORY;
-//                        $display("instr [ALU/ALUI]");
-                    end
-
-                    `OP_BRANCH: begin
-                        // Registers are set by now, we need to enable BU.
-                        br_en <= 1'b1;
-                        state <= `CORE_STATE_MEMORY;
-//                        $display("instr [BRANCH]");
-
-                    end
-
-                    `OP_LOAD: begin
-                        // Load instructions, we need to enable the data memory read
-                        mem_data_r_en <= 1'b1;
-                        mem_data_r_addr <= reg_r_data_1 + imm;
-                        state <= `CORE_STATE_MEMORY;
-//                        $display("instr [LOAD]");
-                    end
-                    `OP_STORE: begin
-                        // Store instructions, we need to enable the data memory write
-                        mem_data_w_en <= 1'b1;
-                        mem_data_w_addr <= reg_r_data_1 + imm;
-                        mem_data_w_data <= reg_r_data_2;
-                        state <= `CORE_STATE_MEMORY;
-//                        $display("instr [STORE]");
-                    end
-
-                    `OP_JAL: begin
-                        // J-type instructions, we need to update the PC
-                        // Unconditional jump, we just add the immediate value to the PC
-                        // imm - 4 because otherwise we would skip instruction at pc + imm
-                        pc <= pc + imm - 4'h4;
-                        reg_w_data <= pc + 4'h4;
-                        state <= `CORE_STATE_MEMORY;
-//                        $display("instr [JAL]");
-                    end
-                    `OP_JALR: begin
-                        // JALR instruction, we need to update the PC
-                        // Unconditional jump with link-register:
-                        //   - add the immediate value to the register value
-                        //   - set the least significant bit to 0
-                        //   - set the PC to the result
-                        //   - set the link register to PC + 4
-                        pc  <= (reg_r_data_1 + imm - 4'h4) & 32'hFFFFFFFE;
-                        reg_w_data <= (reg_r_data_1 + imm) & 32'hFFFFFFFE + 4;
-                        state <= `CORE_STATE_MEMORY;
-//                        $display("instr [JALR]");
-                    end
-
-                    `OP_LUI: begin
-                        // LUI instruction, we need to update the register with an immediate value
-                        reg_w_data <= imm;
-                        state <= `CORE_STATE_MEMORY;
-//                        $display("instr [LUI]");
-                    end
-                    `OP_AUIPC: begin
-                        // AUIPC instruction, we need to add the immediate value to the PC
-                        // and write it to the register
-                        reg_w_data <= pc + imm;
-                        state <= `CORE_STATE_MEMORY;
-//                        $display("instr [AUIPC]");
-                    end
-
-                    `OP_ENVIRONMENT: begin
-                        // ECALL or EBREAK instruction, for now we just halt the core
-                        state <= `CORE_STATE_HALT;
-//                        $display("instr [ECALL/EBREAK]");
-                    end
-
-                    default: begin
-                        // Error state for unsupported opcodes
-                        state <= `CORE_STATE_ERROR;
-//                        $display("UNKNOWN INSTR OPCODE! [%h]", instr);
-                    end
-                endcase
-            end
-
-            `CORE_STATE_MEMORY: begin 
-                // Nothing to do here - we just wait for memory operations to complete.
-                // In case of any other instructions, we just pass through this state.
-                state <= `CORE_STATE_WRITEBACK;
-            end
-
-            `CORE_STATE_WRITEBACK: begin
-                case (opcode)
-                    `OP_ALU, `OP_ALUI: begin
-                        // ALU instructions, we need to write the result back to the register file
-                        reg_w_data <= alu_res;
-                        reg_w_en <= 1'b1;
-                    end
-                    `OP_LOAD: begin
-                        // Load instruction, we need to write the data from memory into the register file.
-                        reg_w_data <= mem_data_r_data;
-                        reg_w_en <= 1'b1;
-                    end
-                    `OP_JAL, `OP_JALR, `OP_LUI, `OP_AUIPC: begin
-                        // JALR, LUI and AUIPC instructions, we need to write the result back to the register file.
-                        // The data was already prepared in the reg_w_data during the EXECUTE stage.
-                        reg_w_en <= 1'b1;
-                    end
-                    default: begin
-                        // No writeback needed for other instructions
-                        reg_w_en <= 1'b0;
-                    end
-                endcase
-
-                // Memory operations, ALU and BU are done by now, we can disable them
-                mem_data_r_en <= 1'b0;
-                mem_data_w_en <= 1'b0;
-                alu_en <= 1'b0;
-                br_en <= 1'b0;
-
-                // Prepare for fetching the next instruction
-                if (opcode == `OP_BRANCH && br_taken) begin
-                    // Branch taken, we need to update the PC
-                    pc <= pc + imm;
+            state <= `CORE_STATE_DECODE;
+        end
+        
+        `CORE_STATE_DECODE: begin
+            // We can now write the imem response into the instruction register.
+            instr <= mem_instr_r_data;
+            // Decoding is now handled by the imm_decoder.
+            // Registers are being automaticly read from the register file as well.
+            // We need to give this cycle for the regfile and imm_decoder to finish.
+            state <= `CORE_STATE_EXECUTE;
+        end
+        
+        `CORE_STATE_EXECUTE: begin
+            case (opcode)
+                `OP_ALU, `OP_ALUI: begin
+                    // Registers are set by now, we need to enable ALU.
+                    alu_en <= 1'b1;
+                    state <= `CORE_STATE_MEMORY;
                 end
-                else begin
-                    // No branch taken, we just increment the PC
-                    pc <= pc + 4;
+
+                `OP_BRANCH: begin
+                    // Registers are set by now, we need to enable BU.
+                    br_en <= 1'b1;
+                    state <= `CORE_STATE_MEMORY;
                 end
-                mem_instr_r_en <= 1'b1;
 
-                state <= `CORE_STATE_FETCH;
+                `OP_LOAD: begin
+                    // Load instructions, we need to enable the data memory read
+                    mem_data_r_en <= 1'b1;
+                    mem_data_r_addr <= reg_r_data_1 + imm;
+                    state <= `CORE_STATE_MEMORY;
+                end
+                `OP_STORE: begin
+                    // Store instructions, we need to enable the data memory write
+                    mem_data_w_en <= 1'b1;
+                    mem_data_w_addr <= reg_r_data_1 + imm;
+                    mem_data_w_data <= reg_r_data_2;
+                    state <= `CORE_STATE_MEMORY;
+                end
+                `OP_JAL: begin
+                    // J-type instructions, we need to update the PC
+                    // Unconditional jump, we just add the immediate value to the PC
+                    // imm - 4 because otherwise we would skip instruction at pc + imm
+                    pc <= pc + imm - 4'h4;
+                    reg_w_data <= pc + 4'h4;
+                    state <= `CORE_STATE_MEMORY;
+                end
+                `OP_JALR: begin
+                    // JALR instruction, we need to update the PC
+                    // Unconditional jump with link-register:
+                    //   - add the immediate value to the register value
+                    //   - set the least significant bit to 0
+                    //   - set the PC to the result
+                    //   - set the link register to PC + 4
+                    pc  <= (reg_r_data_1 + imm - 4'h4) & 32'hFFFFFFFE;
+                    reg_w_data <= (reg_r_data_1 + imm) & 32'hFFFFFFFE + 4;
+                    state <= `CORE_STATE_MEMORY;
+                end
+                `OP_LUI: begin
+                    // LUI instruction, we need to update the register with an immediate value
+                    reg_w_data <= imm;
+                    state <= `CORE_STATE_MEMORY;
+                end
+                `OP_AUIPC: begin
+                    // AUIPC instruction, we need to add the immediate value to the PC
+                    // and write it to the register
+                    reg_w_data <= pc + imm;
+                    state <= `CORE_STATE_MEMORY;
+                end
+                `OP_ENVIRONMENT: begin
+                    // ECALL or EBREAK instruction, for now we just halt the core
+                    state <= `CORE_STATE_HALT;
+                end
+                default: // Error state for unsupported opcodes
+                    state <= `CORE_STATE_ERROR;
+            endcase
+        end
+
+        `CORE_STATE_MEMORY: begin 
+            // Nothing to do here - we just wait for memory operations to complete.
+            // In case of any other instructions, we just pass through this state.
+            state <= `CORE_STATE_WRITEBACK;
+        end
+
+        `CORE_STATE_WRITEBACK: begin
+            case (opcode)
+                `OP_ALU, `OP_ALUI: begin
+                    // ALU instructions, we need to write the result back to the register file
+                    reg_w_data <= alu_res;
+                    reg_w_en <= 1'b1;
+                end
+                `OP_LOAD: begin
+                    // Load instruction, we need to write the data from memory into the register file.
+                    reg_w_data <= mem_data_r_data;
+                    reg_w_en <= 1'b1;
+                end
+                `OP_JAL, `OP_JALR, `OP_LUI, `OP_AUIPC: begin
+                    // JALR, LUI and AUIPC instructions, we need to write the result back to the register file.
+                    // The data was already prepared in the reg_w_data during the EXECUTE stage.
+                    reg_w_en <= 1'b1;
+                end
+                default: begin
+                    // No writeback needed for other instructions
+                    reg_w_en <= 1'b0;
+                end
+            endcase
+
+            // Memory operations, ALU and BU are done by now, we can disable them
+            mem_data_r_en <= 1'b0;
+            mem_data_w_en <= 1'b0;
+            alu_en <= 1'b0;
+            br_en <= 1'b0;
+
+            // Prepare for fetching the next instruction
+            if (opcode == `OP_BRANCH && br_taken) begin
+                // Branch taken, we need to update the PC
+                pc <= pc + imm;
+            end else begin
+                // No branch taken, we just increment the PC
+                pc <= pc + 4;
             end
+            mem_instr_r_en <= 1'b1;
 
-            `CORE_STATE_ERROR, `CORE_STATE_HALT: begin 
-                // Error or halt state, we do nothing and wait for reset
-            end
-        endcase
-    end
-end
+            state <= `CORE_STATE_FETCH;
+        end
 
-initial begin
-    state <= `CORE_STATE_INIT;
-    pc <= 32'b0000;
-    instr <= 32'b0;
+        `CORE_STATE_ERROR, `CORE_STATE_HALT: begin 
+            // Error or halt state, we do nothing and wait for reset
+        end
+    endcase
+    
+    if (!rst_n) state <= `CORE_STATE_INIT;
 end
 
 initial begin

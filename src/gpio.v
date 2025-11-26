@@ -20,17 +20,16 @@ module gpio(
 
     input               w_en,   // write enable
     input       [31:0]  w_addr, // 32-bit address
-    input       [31:0]  w_data // 32-bits of data
+    input       [31:0]  w_data, // 32-bits of data
+    output reg   [7:0]  out
 );
-
-//reg [7:0] out;
 
 always @(posedge clk) begin
 //    r_data <= 1'b0; // TODO allow gpio inputs
     if (w_en) begin
-//        case (w_addr)
-//            8'h00: out <= w_data[7:0];
-//        endcase
+        case (w_addr)
+            8'h00: out <= w_data[7:0];
+        endcase
     end
 end
 

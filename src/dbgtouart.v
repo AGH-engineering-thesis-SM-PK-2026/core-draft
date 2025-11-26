@@ -5,7 +5,7 @@
 
 module dbgtouart (
     input wire n_rst,
-    input wire dbgclk,
+    input wire clk,
     input wire trig,
     input wire uartbusy,
     output reg busy,
@@ -39,7 +39,7 @@ hextoascii toascii (
 
 unpack1to8 unpack (
     .n_rst(n_rst),
-    .clk(dbgclk),
+    .clk(clk),
     .inen(inen),
     .in(dbgout),
     .outen(outen),
@@ -66,7 +66,7 @@ parameter DBG_WAIT = 4'b1111;
 reg [3:0] dbgstate;
 reg packetend;
 
-always @(posedge dbgclk) begin
+always @(posedge clk) begin
     case (dbgstate)
     DBG_INIT: begin
         if (trig && !busy) begin

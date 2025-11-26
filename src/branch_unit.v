@@ -22,34 +22,20 @@ module branch_unit (
 always @* begin
     if (br_en) begin
         case (funct3)
-            `FUNCT3_BEQ: begin    // Branch if EQual
+            `FUNCT3_BEQ:    // Branch if EQual
                 br_taken <= (br_data_a == br_data_b);
-                $display("branch == %s", br_taken ? "taken" : "skip");
-            end
-            `FUNCT3_BNE: begin    // Branch if Not Equal
+            `FUNCT3_BNE:    // Branch if Not Equal
                 br_taken <= (br_data_a != br_data_b);
-                $display("branch != %s", br_taken ? "taken" : "skip");
-            end
-            `FUNCT3_BLT: begin    // Branch if Less Than
+            `FUNCT3_BLT:    // Branch if Less Than
                 br_taken <= ($signed(br_data_a) < $signed(br_data_b));
-                $display("branch <S %s", br_taken ? "taken" : "skip");
-            end
-            `FUNCT3_BGE: begin    // Branch if Greater or Equal
+            `FUNCT3_BGE:    // Branch if Greater or Equal
                 br_taken <= ($signed(br_data_a) >= $signed(br_data_b));
-                $display("branch >=S %s", br_taken ? "taken" : "skip");
-            end
-            `FUNCT3_BLTU: begin   // Branch if Less Than Unsigned
+            `FUNCT3_BLTU:   // Branch if Less Than Unsigned
                 br_taken <= (br_data_a < br_data_b);
-                $display("branch <U %s", br_taken ? "taken" : "skip");
-            end
-            `FUNCT3_BGEU: begin   // Branch if Greater or Equal Unsigned
+            `FUNCT3_BGEU:   // Branch if Greater or Equal Unsigned
                 br_taken <= (br_data_a >= br_data_b);
-                $display("branch >=U %s", br_taken ? "taken" : "skip");
-            end
-            default: begin       // error case, prevent latches  
+            default:        // error case, prevent latches  
                 br_taken <= 1'b0;
-                $display("branch UNKNOWN!");
-            end
         endcase
     end
     else br_taken <= 1'b0;
