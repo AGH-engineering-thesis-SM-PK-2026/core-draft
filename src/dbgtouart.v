@@ -88,14 +88,14 @@ always @(posedge clk) begin
         sigchar <= ",";
         empty1 <= 1'b0;
         srcsel <= 1'b1;
-        dbgstate <= DBG_TXINIT;     
+        dbgsel <= dbgsel + 1'b1;
+        if (dbgsel == 5'b11111) dbgstate <= DBG_ENDOFP;
+        else dbgstate <= DBG_TXINIT;
     end
     DBG_REGSEL: begin
         // start switch to next register
-        dbgsel <= dbgsel + 1'b1;
         srcsel <= 1'b0;
-        if (dbgsel == 5'b11111) dbgstate <= DBG_ENDOFP;
-        else dbgstate <= DBG_READ8A;
+        dbgstate <= DBG_READ8A;
     end
     DBG_ENDOFP: begin
         // end of packet '\n'

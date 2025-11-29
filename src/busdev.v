@@ -12,25 +12,32 @@ module busdev #(
     input wire clk,
     input wire en,
     input wire [31:0] addr,
-    output reg deven,
-    output reg [31:0] devaddr,
-    output reg busy
+    output wire deven,
+    output wire [MASK-1:0] devaddr,
+    output wire busy
 );
 
 wire [31-MASK:0] base = addr[31:MASK];
 
-always @(posedge clk) begin
-    deven <= 1'b0;
+assign deven = base == BASE ? en : 1'b0;
+assign devaddr = addr[MASK-1:0];
+assign busy = base == BASE;
 
-    if (en) busy <= 1'b0;
-
-    if (en && base == BASE) begin
-        devaddr <= addr - OFFS;
-        deven <= 1'b1;
-        busy <= 1'b1;
-    end
-    
-    if (!n_rst) busy <= 1'b0;
-end
+// previously I've imagined a synchronous circuit - this turned out
+// unnecessary, the path is very short here with little logic in
+// between.
+//always @(posedge clk) begin
+//    deven <= 1'b0;
+//
+//    if (en) busy <= 1'b0;
+//
+//    if (en && base == BASE) begin
+//        devaddr <= addr[MASK-1:0];
+//        deven <= 1'b1;
+//        busy <= 1'b1;
+//    end
+//    
+//    if (!n_rst) busy <= 1'b0;
+//end
 
 endmodule

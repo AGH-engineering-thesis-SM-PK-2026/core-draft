@@ -26,7 +26,7 @@ wire cpuclklocked;
 
 prescaler #(
     .FMUL(40.0),
-    .FDIV(5),
+    .FDIV(8),
     .CDIV(125)
 ) prescalercpu (
     .n_rst(n_rst),
@@ -76,15 +76,28 @@ wire    [31:0]  dbg_pc;
 wire    [31:0]  dbg_reg_data;
 wire    [4:0]   dbg_reg_sel;
 
-//data_bus main_bus (
-//    .clk(cpuclk),
-//    .r_en(mem_data_r_en),
-//    .r_addr(mem_data_r_addr),
-//    .r_data(mem_data_r_data),
-//    .w_en(mem_data_w_en),
-//    .w_addr(mem_data_w_addr),
-//    .w_data(mem_data_w_data)
-//);
+wire clk_enable;
+wire cycle_end;
+
+wire cpuhalt;
+wire cpustart;
+wire cpustep;
+wire cpucycle;
+wire cpurst;
+wire freeze;
+
+cmu cmu1 (
+    .clk_in(cpuclk),
+    .rst_n(n_rst && cpuclklocked),
+    .trig_halt(cpuhalt),
+    .trig_unhalt(cpustart),
+    .trig_cycle(cpucycle),
+    .trig_step(cpustep),
+    .freeze(freeze),
+    .cycle_end(cycle_end),
+    .clk_enable(clk_enable),
+    .debug_trig()
+);
 
 busdev #(
     .BASE(28'h0000001),
@@ -152,7 +165,7 @@ memory #(
 
 memory #(
     .NAME("PROG"), 
-    .INIT_FILE("iotest.mem")
+    .INIT_FILE("init_void.mem")
 ) mem_instr (
     .clk(cpuclk),
     .r_en(mem_instr_r_en),
@@ -164,12 +177,18 @@ memory #(
     .state()
 );
 
+wire [3:0] dbg_state;
+assign led0 = dbg_state[0];
+assign led1 = dbg_state[1];
+assign led2 = dbg_state[2];
+assign led3 = dbg_state[3];
+
 core cpu1 (
     .clk(cpuclk),
-    .rst_n(n_rst && cpuclklocked),
-    .mem_instr_r_en(mem_instr_r_en),
-    .mem_instr_r_addr(mem_instr_r_addr),
-    .mem_instr_r_data(mem_instr_r_data),
+    .rst_n(n_rst && cpuclklocked && !cpurst),
+    .mem_instr_r_en(mem_instr_r_en),//),
+    .mem_instr_r_addr(mem_instr_r_addr),//),
+    .mem_instr_r_data(mem_instr_r_data),//),
     .mem_instr_w_en(),
     .mem_instr_w_addr(),
     .mem_instr_w_data(),
@@ -179,12 +198,12 @@ core cpu1 (
     .mem_data_w_en(bus_w_en),
     .mem_data_w_addr(bus_w_addr),
     .mem_data_w_data(bus_w_data),
-    .dbg_state(jb_state),    
+    .dbg_state(dbg_state),    
     .dbg_pc(dbg_pc),
     .dbg_reg_data(dbg_reg_data),
     .dbg_reg_sel(dbg_reg_sel),
-    .clk_enable(),
-    .cycle_end()
+    .clk_enable(clk_enable),
+    .cycle_end(cycle_end)
 );
 
 wire uartbusy;
@@ -194,7 +213,9 @@ wire [7:0] charin;
 wire uartdone;
 wire [7:0] charout;
 
-uarttx dbguarttx (
+uarttx #(
+    .PREDIV(520) // 9600bps @ f=5MHz
+) dbguarttx (
     .n_rst(n_rst && cpuclklocked),
     .clk(cpuclk),
     .charin(charin),
@@ -203,7 +224,10 @@ uarttx dbguarttx (
     .phytx(uartout)
 );
 
-uartrx ctluartrx (
+uartrx #(
+    .PREDIV(520), // 9600bps @ f=5MHz
+    .PREMID(250)  // midpoint for sampling
+) ctluartrx (
     .n_rst(n_rst && cpuclklocked),
     .clk(cpuclk),
     .charout(charout),
@@ -212,15 +236,18 @@ uartrx ctluartrx (
     .phyrx(uartin)
 );
 
+//wire [4:0] sel_tmp;
+//assign mem_instr_r_addr = {25'b0,sel_tmp,2'b0};
+
 dbgtouart dbguart (
     .n_rst(n_rst && cpuclklocked),
     .clk(cpuclk),
     .trig(trig),
     .uartbusy(uartbusy),
     .busy(), // .busy(led1)
-    .dbgsel(dbg_reg_sel),
-    .dbgreaden(),
-    .dbgout(dbg_reg_data),
+    .dbgsel(dbg_reg_sel),//sel_tmp),
+    .dbgreaden(),//mem_instr_r_en),
+    .dbgout(dbg_reg_data),//mem_instr_r_data),
     .charout(charin),
     .uarttxen(uarttxen)
 );
@@ -230,11 +257,12 @@ uarttoctl ctluart (
     .clk(cpuclk),
     .charin(charout),
     .uartdone(uartdone),
-    .acklast(),
-    .cpuhalt(led0),
-    .cpustart(led1),
-    .cpustep(led2),
-    .cpurst(led3),
+    .cpuhalt(cpuhalt),
+    .cpustart(cpustart),
+    .cpustep(cpustep),
+    .cpucycle(cpucycle),
+    .cpurst(cpurst),
+    .freeze(freeze),
     .dvpage(),
     .pvpage(),
     .progen(mem_instr_w_en),

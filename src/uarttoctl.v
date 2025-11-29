@@ -18,12 +18,12 @@ module uarttoctl #(
     input wire clk,
     input wire [7:0] charin,
     input wire uartdone,
-    input wire acklast,
     output reg cpuhalt,
     output reg cpustart,
     output reg cpustep,
+    output reg cpucycle,
     output reg cpurst,
-    output wire dbg,
+    output reg freeze,
     output reg [DVPBITS-1:0] dvpage,
     output reg [PVPBITS-1:0] pvpage,
     output reg progen,
@@ -42,9 +42,6 @@ wire full8;
 reg packinen;
 reg packouten;
 
-assign dbg = progen;
-//assign dbg = empty8;
-//assign dbg = packinen;
 
 asciitohex tohex (
     .charin(data),
@@ -68,23 +65,24 @@ pack8to1 pack (
 `define CMD_VIEW 2'b10
 `define CMD_NONE 2'b00
 
-`define CTL_STARTP 5'b00000 // command name
+`define CTL_STARTC 5'b00000 // command name
 `define CTL_READ0A 5'b00001 // push to arg0
 `define CTL_READ0B 5'b00010 // reflect about arg0
 `define CTL_READ0C 5'b00011 // arg0 comma ','
 `define CTL_READ1A 5'b00100 // push to arg0
 `define CTL_READ1B 5'b00101 // reflect about arg1
-`define CTL_READPA 5'b00110 // read body
-`define CTL_READPB 5'b00111 // read body
-`define CTL_READPF 5'b01000 // read body
-`define CTL_PCOMMA 5'b01001 // prog comma ','
-`define CTL_STARTB 5'b01010 // start of body '['
-`define CTL_ENDOFH 5'b01011 // end-of-halt '\n'
-`define CTL_ENDOFZ 5'b01100 // end-of-ztart '\n'
-`define CTL_ENDOFS 5'b01101 // end-of-step '\n'
-`define CTL_ENDOFR 5'b01110 // end-of-reset '\n'
-`define CTL_ENDOFV 5'b01111 // end-of-view '\n'
-`define CTL_BADCMD 5'b10000 // bad command
+`define CTL_READST 5'b00110
+`define CTL_READPA 5'b01000 // read body
+`define CTL_READPB 5'b01001 // read body
+`define CTL_READPF 5'b01010 // read body
+`define CTL_PCOMMA 5'b01011 // prog comma ','
+`define CTL_STARTP 5'b01100 // start of body '['
+`define CTL_ENDOFH 5'b10000 // end-of-halt '\n'
+`define CTL_ENDOFZ 5'b10001 // end-of-ztart '\n'
+`define CTL_ENDOFS 5'b10010 // end-of-step '\n'
+`define CTL_ENDOFR 5'b10011 // end-of-reset '\n'
+`define CTL_ENDOFV 5'b10100 // end-of-view '\n'
+`define CTL_BADCMD 5'b11111 // bad command
 
 reg [4:0] ctlstate;
 
@@ -97,12 +95,11 @@ reg [15:0] arg1;
 reg inbound;
 
 always @(posedge clk) begin
-    if (acklast) begin
-        cpuhalt <= 1'b0;
-        cpustart <= 1'b0;
-        cpustep <= 1'b0;
-        cpurst <= 1'b0;
-    end
+    cpuhalt <= 1'b0;
+    cpustart <= 1'b0;
+    cpustep <= 1'b0;
+    cpucycle <= 1'b0;
+    cpurst <= 1'b0;
 
     if (!uartdone) readinit <= 1'b0;
 
@@ -115,7 +112,7 @@ always @(posedge clk) begin
     end
     
     case (ctlstate)
-    `CTL_STARTP: begin
+    `CTL_STARTC: begin
         if (inbound) begin
             cmdid <= `CMD_NONE;
             arg0 <= 16'h0000;
@@ -124,12 +121,13 @@ always @(posedge clk) begin
             case (data)
             "H": ctlstate <= `CTL_ENDOFH;
             "Z": ctlstate <= `CTL_ENDOFZ;
-            "S": ctlstate <= `CTL_ENDOFS;
+            "S": ctlstate <= `CTL_READST;
             "R": ctlstate <= `CTL_ENDOFR;
-            "P": begin
+            "[": begin
                 cmdid <= `CMD_PROG;
                 cpuhalt <= 1'b1;
-                ctlstate <= `CTL_STARTB;
+                freeze <= 1'b1;
+                ctlstate <= `CTL_STARTP;
             end
             "V": begin 
                 cmdid <= `CMD_VIEW;
@@ -157,7 +155,7 @@ always @(posedge clk) begin
             packouten <= 1'b1;
             // prog expects program data start, view - next param
             case (cmdid)
-            `CMD_PROG: ctlstate <= `CTL_STARTB;
+            `CMD_PROG: ctlstate <= `CTL_STARTP;
             `CMD_VIEW: ctlstate <= `CTL_READ0C;
             default: ctlstate <= `CTL_BADCMD;
             endcase
@@ -190,6 +188,15 @@ always @(posedge clk) begin
             endcase
         end        
     end
+    `CTL_READST: begin
+        if (inbound) begin
+            case (data)
+            "1": cpustep <= 1'b1;
+            ">": cpucycle <= 1'b1;
+            endcase
+            ctlstate <= `CTL_ENDOFS;
+        end
+    end
     `CTL_READPA: begin
         packouten <= 1'b0;
         // if inbound, push to pack
@@ -216,52 +223,51 @@ always @(posedge clk) begin
         if (inbound) begin
             progen <= 1'b0;
             packouten <= 1'b0;
-            progaddr <= progaddr + 1'b1;
+            progaddr <= progaddr + 3'b100;
             ctlstate <= `CTL_READPA;
             if (data == "]") ctlstate <= `CTL_ENDOFR;
         end
     end
-    `CTL_STARTB: begin
-        progaddr <= 1'b1;
+    `CTL_STARTP: begin
+        progaddr <= 1'b0;
         ctlstate <= `CTL_READPA;
     end
     `CTL_ENDOFH: begin
         if (inbound) begin
             cpuhalt <= 1'b1;
-            ctlstate <= `CTL_STARTP;
+            ctlstate <= `CTL_STARTC;
         end
     end
     `CTL_ENDOFZ: begin
         if (inbound) begin
             cpustart <= 1'b1;
-            ctlstate <= `CTL_STARTP;
+            ctlstate <= `CTL_STARTC;
         end    
     end    
     `CTL_ENDOFS: begin
-        if (inbound) begin
-            cpustep <= 1'b1;
-            ctlstate <= `CTL_STARTP;
-        end    
+        if (inbound) ctlstate <= `CTL_STARTC;
+ 
     end    
     `CTL_ENDOFR: begin
         if (inbound) begin
             cpurst <= 1'b1;
-            ctlstate <= `CTL_STARTP;
+            freeze <= 1'b0;
+            ctlstate <= `CTL_STARTC;
         end    
     end
     `CTL_ENDOFV: begin
         dvpage <= arg0[DVPBITS-1:0];
         pvpage <= arg1[PVPBITS-1:0];
-        ctlstate <= `CTL_STARTP;
+        ctlstate <= `CTL_STARTC;
     end
     `CTL_BADCMD: begin
         // bad command, wait for end of packet and reset
-        if (inbound && data == "\n") ctlstate <= `CTL_STARTP;
+        if (inbound && data == "\n") ctlstate <= `CTL_STARTC;
     end
     endcase
 
     if (!n_rst) begin
-        ctlstate <= `CTL_STARTP;
+        ctlstate <= `CTL_STARTC;
         packinen <= 1'b0;
         packouten <= 1'b0;
         progen <= 1'b0;
