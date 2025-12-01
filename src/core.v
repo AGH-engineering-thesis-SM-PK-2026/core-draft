@@ -62,9 +62,8 @@ module core (
 
     // Debug interface, all the outputs are hardwired to the core parts
     output      [3:0]   dbg_state,          // state of the core
-    output      [31:0]  dbg_pc,             // debug pc
-    input       [4:0]   dbg_reg_sel,        // debug reg selector
-    output      [31:0]  dbg_reg_data        // debug reg data
+    input       [4:0]   dbg_sel,        // debug reg selector
+    output      [31:0]  dbg_data        // debug reg data
 );
 
 reg     [3:0]   state = `CORE_STATE_INIT1;         // state of the core
@@ -108,10 +107,13 @@ reg             br_en;          // branch enable
 wire            br_taken;       // branch taken
 
 assign dbg_state = state;
-assign dbg_pc = pc;
 
 wire rdy;
 wire cpu_rst_n = rst_n && rdy;
+
+wire [31:0] dbg_reg_out;
+
+assign dbg_data = dbg_sel == 1'b0 ? pc : dbg_reg_out;
 
 regfile regfile1 (
     .clk(clk),
@@ -127,8 +129,8 @@ regfile regfile1 (
     .w_sel(rd),
     .w_data(reg_w_data),
     
-    .dbg_reg_sel(dbg_reg_sel),
-    .dbg_reg_data(dbg_reg_data)
+    .dbg_reg_sel(dbg_sel),
+    .dbg_reg_data(dbg_reg_out)
 );
 
 imm_decoder imm_decoder1 (

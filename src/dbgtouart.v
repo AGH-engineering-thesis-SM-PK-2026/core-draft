@@ -9,7 +9,7 @@ module dbgtouart (
     input wire trig,
     input wire uartbusy,
     output reg busy,
-    output reg [4:0] dbgsel,
+    output reg [5:0] dbgsel,
     output reg dbgreaden,
     input wire [31:0] dbgout,
     output wire [7:0] charout,
@@ -49,16 +49,17 @@ unpack1to8 unpack (
 );
 
 parameter DBG_INIT = 4'b0000;
-parameter DBG_READ8A = 4'b0001;
-parameter DBG_READ8B = 4'b0010;
-parameter DBG_WAIT8 = 4'b0011;
-parameter DBG_PSTART = 4'b0100;
-parameter DBG_FCOMMA = 4'b0101;
-parameter DBG_REGSEL = 4'b0110;
-parameter DBG_ENDOFP = 4'b0111;
-parameter DBG_TXINIT = 4'b1000;
-parameter DBG_TXSEND1 = 4'b1001;
-parameter DBG_TXSEND8 = 4'b1010;
+parameter DBG_READEN = 4'b0001;
+parameter DBG_READ8A = 4'b0010;
+parameter DBG_READ8B = 4'b0011;
+parameter DBG_WAIT8 = 4'b0100;
+parameter DBG_PSTART = 4'b0101;
+parameter DBG_FCOMMA = 4'b0110;
+parameter DBG_REGSEL = 4'b0111;
+parameter DBG_ENDOFP = 4'b1000;
+parameter DBG_TXINIT = 4'b1001;
+parameter DBG_TXSEND1 = 4'b1010;
+parameter DBG_TXSEND8 = 4'b1011;
 parameter DBG_TXPOLLA = 4'b1100;
 parameter DBG_TXPOLLB = 4'b1101;
 parameter DBG_WAIT = 4'b1111;
@@ -71,7 +72,7 @@ always @(posedge clk) begin
     DBG_INIT: begin
         if (trig && !busy) begin
             busy <= 1'b1;
-            dbgsel <= 5'b00000;
+            dbgsel <= 6'b000000;
             dbgstate <= DBG_PSTART;
             packetend <= 1'b0;
         end
@@ -89,7 +90,7 @@ always @(posedge clk) begin
         empty1 <= 1'b0;
         srcsel <= 1'b1;
         dbgsel <= dbgsel + 1'b1;
-        if (dbgsel == 5'b11111) dbgstate <= DBG_ENDOFP;
+        if (dbgsel == 6'b111111) dbgstate <= DBG_ENDOFP;
         else dbgstate <= DBG_TXINIT;
     end
     DBG_REGSEL: begin
@@ -105,14 +106,18 @@ always @(posedge clk) begin
         packetend <= 1'b1;
         dbgstate <= DBG_TXINIT;
     end
-    DBG_READ8A: begin
-        // read dbg reg
+    DBG_READEN: begin
+        // read dbg enable
         dbgreaden <= 1'b1;
+        dbgstate <= DBG_READ8A;    
+    end
+    DBG_READ8A: begin
+        // wait cycle
+        dbgreaden <= 1'b0;
         dbgstate <= DBG_READ8B;
     end
     DBG_READ8B: begin
         // pass into 8to1unpack
-        dbgreaden <= 1'b0;
         inen <= 1'b1;
         dbgstate <= DBG_WAIT8;
     end

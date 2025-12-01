@@ -23,6 +23,7 @@ module uarttoctl #(
     output reg cpustep,
     output reg cpucycle,
     output reg cpurst,
+    output reg cpuprint,
     output reg freeze,
     output reg [DVPBITS-1:0] dvpage,
     output reg [PVPBITS-1:0] pvpage,
@@ -80,8 +81,9 @@ pack8to1 pack (
 `define CTL_ENDOFH 5'b10000 // end-of-halt '\n'
 `define CTL_ENDOFZ 5'b10001 // end-of-ztart '\n'
 `define CTL_ENDOFS 5'b10010 // end-of-step '\n'
-`define CTL_ENDOFR 5'b10011 // end-of-reset '\n'
-`define CTL_ENDOFV 5'b10100 // end-of-view '\n'
+`define CTL_ENDOFP 5'b10011 // end-of-print '\n'
+`define CTL_ENDOFR 5'b10100 // end-of-reset '\n'
+`define CTL_ENDOFV 5'b10101 // end-of-view '\n'
 `define CTL_BADCMD 5'b11111 // bad command
 
 reg [4:0] ctlstate;
@@ -100,6 +102,7 @@ always @(posedge clk) begin
     cpustep <= 1'b0;
     cpucycle <= 1'b0;
     cpurst <= 1'b0;
+    cpuprint <= 1'b0;
 
     if (!uartdone) readinit <= 1'b0;
 
@@ -122,6 +125,7 @@ always @(posedge clk) begin
             "H": ctlstate <= `CTL_ENDOFH;
             "Z": ctlstate <= `CTL_ENDOFZ;
             "S": ctlstate <= `CTL_READST;
+            "P": ctlstate <= `CTL_ENDOFP;
             "R": ctlstate <= `CTL_ENDOFR;
             "[": begin
                 cmdid <= `CMD_PROG;
@@ -246,8 +250,13 @@ always @(posedge clk) begin
     end    
     `CTL_ENDOFS: begin
         if (inbound) ctlstate <= `CTL_STARTC;
- 
     end    
+    `CTL_ENDOFP: begin
+        if (inbound) begin
+            cpuprint <= 1'b1;
+            ctlstate <= `CTL_STARTC;
+        end
+    end
     `CTL_ENDOFR: begin
         if (inbound) begin
             cpurst <= 1'b1;
