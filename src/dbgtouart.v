@@ -9,7 +9,7 @@ module dbgtouart (
     input wire trig,
     input wire uartbusy,
     output reg busy,
-    output reg [5:0] dbgsel,
+    output reg [4:0] dbgsel,
     output reg dbgreaden,
     input wire [31:0] dbgout,
     output wire [7:0] charout,
@@ -72,7 +72,7 @@ always @(posedge clk) begin
     DBG_INIT: begin
         if (trig && !busy) begin
             busy <= 1'b1;
-            dbgsel <= 6'b000000;
+            dbgsel <= 5'b00000;
             dbgstate <= DBG_PSTART;
             packetend <= 1'b0;
         end
@@ -90,7 +90,7 @@ always @(posedge clk) begin
         empty1 <= 1'b0;
         srcsel <= 1'b1;
         dbgsel <= dbgsel + 1'b1;
-        if (dbgsel == 6'b111111) dbgstate <= DBG_ENDOFP;
+        if (dbgsel == 5'b11111) dbgstate <= DBG_ENDOFP;
         else dbgstate <= DBG_TXINIT;
     end
     DBG_REGSEL: begin

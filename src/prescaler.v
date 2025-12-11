@@ -5,7 +5,7 @@
 
 module prescaler #(
     FMUL = 40.0,
-    FDIV = 5,
+    FDIV = 1,
     CDIV = 25
 ) (
     input wire n_rst,

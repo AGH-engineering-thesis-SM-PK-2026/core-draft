@@ -25,6 +25,7 @@ module alu (
 );
 
 wire    [31:0]  op_a;
+wire signed [31:0] op_as;
 wire    [31:0]  op_b;
 wire    [4:0]   shamt;          // shift amount - lower 5 bits of the second operand for shift operations
 wire            alt_action;     // alternate action for current funct3, eg. sub instead of add
@@ -32,13 +33,13 @@ wire            alt_action;     // alternate action for current funct3, eg. sub 
 assign op_a = reg_data_1;
 assign op_b = src_sel ? reg_data_2 : immediate;
 assign shamt = op_b[4:0];
-assign alt_action = (src_sel && funct7 == `FUNCT7_SUB_SRA) ? 1'b1 : 1'b0;
+assign alt_action = funct7 == `FUNCT7_SUB_SRA;
 
 always @* begin
     if(alu_en) begin
         case (funct3)
             `FUNCT3_ADD_SUB: begin
-                if(alt_action) begin     // Subtraction
+                if (alt_action && src_sel) begin     // Subtraction
                     alu_res = op_a - op_b;
                     $display("alu %0d - %0d = %0d", op_a, op_b, alu_res);
                 end else begin           // Addition
@@ -61,6 +62,10 @@ always @* begin
             `FUNCT3_SLL: begin           // Shift Left Logical (fill with 0)
                 alu_res = op_a << shamt;
                 $display("alu %0d << %0d = %0d", op_a, shamt, alu_res);
+            end
+            `FUNCT3_SRL_SRA: begin
+                if (alt_action) alu_res = $signed(op_a) >>> shamt;
+                else alu_res = op_a >> shamt;
             end
             `FUNCT3_SLT: begin           // Set Less Than (set to 1 if op_a < op_b)
                 alu_res = ($signed(op_a) < $signed(op_b)) ? 32'b1 : 32'b0;

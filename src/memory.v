@@ -22,7 +22,7 @@
 `define MEMORY_STATE_ALIGNMENT      2'b11   // Aliginment error
 
 module memory #(
-    parameter NAME                = "",
+    parameter NAME              = "",
     parameter MEMORY_SIZE_WORDS = 1024,                     // Memory size in 32-bit words
     parameter INIT_FILE         = "",                       // Path to memory initialization file. Zero-initialized if none is provided.
     parameter ADDR_WIDTH        = $clog2(MEMORY_SIZE_WORDS) // Memory bus size. By default, the size needed to address MEMORY_SIZE_WORDS.
@@ -32,10 +32,12 @@ module memory #(
     input               r_en,   // read enable
     input       [31:0]  r_addr, // 32-bit address
     output reg  [31:0]  r_data, // 32-bits of data
+    input        [1:0]  r_bmul, // how many bytes (0->1, 1->2, 2->4)
 
     input               w_en,   // write enable
     input       [31:0]  w_addr, // 32-bit address
     input       [31:0]  w_data, // 32-bits of data
+    input        [1:0]  w_bmul, // how many bytes (0->1, 1->2, 2->4)
 
     output reg  [1:0]   state   // memory state (error codes)
 );
@@ -49,11 +51,21 @@ wire    [1:0]   r_addr_offset;
 wire    [29:0]  w_addr_wrd;
 wire    [1:0]   w_addr_offset;
 
-assign r_addr_wrd       = r_addr[ADDR_WIDTH:2];
+assign r_addr_wrd       = r_addr[ADDR_WIDTH+2:2];
 assign r_addr_offset    = r_addr[1:0];
-assign w_addr_wrd       = w_addr[ADDR_WIDTH:2];
+assign w_addr_wrd       = w_addr[ADDR_WIDTH+2:2];
 assign w_addr_offset    = w_addr[1:0];
 
+//reg [3:0] w_strb;
+
+//always @(*) begin
+//    case (w_bmul)
+//    2'b00: w_strb = 1<<w_addr_offset;
+//    2'b10: w_strb = 4'b1111;
+//    endcase
+//end
+
+integer i;
 always @(posedge clk) begin
     // Error checking
     if (r_en && w_en) begin
@@ -75,14 +87,15 @@ always @(posedge clk) begin
     
     // Memory operations
     else if (w_en) begin
+//        for (i=0;i<4;i=i+1) begin
+//            if (w_strb[i]) mem[w_addr_wrd][i*8+:8] <= w_data[i*8+:8];
+//        end
         mem[w_addr_wrd] <= w_data;
         state <= `MEMORY_STATE_SUCCESS;
-//        $strobe("mem %s write %0h at [%08h]", NAME, w_data, w_addr);
     end
     else if (r_en) begin
         r_data <= mem[r_addr_wrd];
         state <= `MEMORY_STATE_SUCCESS;
-//        $strobe("mem %s read %0h at [%08h]", NAME, r_data, r_addr);
     end
 end
 

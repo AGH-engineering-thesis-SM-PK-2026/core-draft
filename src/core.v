@@ -55,10 +55,12 @@ module core (
     output reg          mem_data_r_en,      // read enable
     output reg  [31:0]  mem_data_r_addr,    // 32-bit address
     input       [31:0]  mem_data_r_data,    // 32-bits of data
+    output reg  [1:0]   mem_data_r_bmul,     // maps neatly to funct3
 
     output reg          mem_data_w_en,      // write enable
     output reg  [31:0]  mem_data_w_addr,    // 32-bit address
     output reg  [31:0]  mem_data_w_data,    // 32-bits of data
+    output reg  [1:0]   mem_data_w_bmul,     // maps neatly to funct3
 
     // Debug interface, all the outputs are hardwired to the core parts
     output      [3:0]   dbg_state,          // state of the core
@@ -223,6 +225,7 @@ always @(posedge clk) begin
                         // Load instructions, we need to enable the data memory read
                         mem_data_r_en <= 1'b1;
                         mem_data_r_addr <= reg_r_data_1 + imm;
+                        mem_data_r_bmul <= funct3[1:0];
                         state <= `CORE_STATE_MEMORY;
                     end
                     `OP_STORE: begin
@@ -230,6 +233,7 @@ always @(posedge clk) begin
                         mem_data_w_en <= 1'b1;
                         mem_data_w_addr <= reg_r_data_1 + imm;
                         mem_data_w_data <= reg_r_data_2;
+                        mem_data_w_bmul <= funct3[1:0];
                         state <= `CORE_STATE_MEMORY;
                     end
                     `OP_JAL: begin

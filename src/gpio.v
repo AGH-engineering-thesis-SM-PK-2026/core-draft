@@ -11,26 +11,25 @@
  *
  *****************************************************************************/
 
-module gpio(
-    input               clk,
-
-//    input               r_en,   // read enable
-//    input       [31:0]  r_addr, // 32-bit address
-//    output reg  [31:0]  r_data, // 32-bits of data
-
-    input               w_en,   // write enable
-    input       [31:0]  w_addr, // 32-bit address
-    input       [31:0]  w_data, // 32-bits of data
-    output reg   [7:0]  out
+module gpio (
+    input wire clk,
+    input wire ren,
+    output reg [7:0] rdata,
+    input wire wen,
+    input wire [7:0] wdata,
+    input wire [7:0] phyin,
+    output reg [7:0] phyout
 );
 
+reg [7:0] m_phyin;
+reg [7:0] s_phyin;
+
 always @(posedge clk) begin
-//    r_data <= 1'b0; // TODO allow gpio inputs
-    if (w_en) begin
-        case (w_addr)
-            8'h00: out <= w_data[7:0];
-        endcase
-    end
+    m_phyin <= phyin;
+    s_phyin <= m_phyin;
+
+    if (wen) phyout <= wdata[7:0];
+    if (ren) rdata <= s_phyin;
 end
 
 endmodule

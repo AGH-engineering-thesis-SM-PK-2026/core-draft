@@ -1,9 +1,6 @@
 `timescale 1ns / 1ps
 
-module toplevel #(
-    parameter DATA_INIT_FILE        = "",
-    parameter INSTR_INIT_FILE       = ""
-) (
+module toplevel (
     input               sysclk,
     input               btnrst,
     input               btntrig,
@@ -13,9 +10,13 @@ module toplevel #(
     output              led1,
     output              led2,
     output              led3,
-    input   [3:0]       jb_sel,
-    output  [3:0]       jb_state,
-    output  [7:0]       aout
+    input   [7:0]       in0,
+    output  [7:0]       out0,
+    output  [4:0]       vidr,
+    output  [5:0]       vidg,
+    output  [4:0]       vidb,
+    output              vidhs,
+    output              vidvs
 );
 
 wire n_rst = !btnrst;
@@ -23,16 +24,27 @@ wire n_rst = !btnrst;
 // clock downscaler
 wire cpuclk;
 wire cpuclklocked;
+wire vgaclk;
+wire vgaclklocked;
 
 prescaler #(
-    .FMUL(40.0),
-    .FDIV(8),
+    .FMUL(5.0),
     .CDIV(125)
 ) prescalercpu (
     .n_rst(n_rst),
     .clkin(sysclk),
     .clkout(cpuclk),
     .locked(cpuclklocked)
+);
+
+prescaler #(
+    .FMUL(8.0),
+    .CDIV(25)
+) prescalervga (
+    .n_rst(n_rst),
+    .clkin(sysclk),
+    .clkout(vgaclk),
+    .locked(vgaclklocked)
 );
 
 wire btnprint;
@@ -57,12 +69,19 @@ wire    [31:0]  mem_instr_w_data;
 wire            bus_r_en;
 wire    [31:0]  bus_r_addr;
 wire    [31:0]  bus_r_data;
+wire    [1:0]   bus_r_bmul;
 wire            bus_w_en;
 wire    [31:0]  bus_w_addr;
 wire    [31:0]  bus_w_data;
+wire    [1:0]   bus_w_bmul;
 
-wire            gpio_a_en;
-wire    [31:0]  gpio_a_addr;
+wire            gpio0_r_en;
+wire            gpio0_w_en;
+wire    [7:0]   gpio0_r_data;
+wire    [7:0]   gpio0_w_data;
+
+wire            term0_en;
+wire    [3:0]   term0_addr;
 
 // Data memory bus
 wire            mem_data_r_en;
@@ -73,9 +92,8 @@ wire    [31:0]  mem_data_w_addr;
 wire            mem_data_busy;
 
 // Debug bus
-wire    [31:0]  dbg_reg_out;
 wire    [31:0]  dbg_out;
-wire    [5:0]   dbg_sel;
+wire    [4:0]   dbg_sel;
 
 wire clk_enable;
 wire cycle_end;
@@ -104,14 +122,65 @@ busdev #(
     .BASE(28'h0000001),
     .OFFS(32'h00000010),
     .MASK(4)
-) gpio_a_w (
+) gpio0_w (
     .n_rst(n_rst && cpuclklocked),
     .clk(cpuclk),
     .en(bus_w_en),
     .addr(bus_w_addr),
-    .deven(gpio_a_en),
-    .devaddr(gpio_a_addr),
+    .deven(gpio0_w_en),
+    .devaddr(),
     .busy()
+);
+
+busdev #(
+    .BASE(28'h0000001),
+    .OFFS(32'h00000010),
+    .MASK(4)
+) gpio0_r (
+    .n_rst(n_rst && cpuclklocked),
+    .clk(cpuclk),
+    .en(bus_r_en),
+    .addr(bus_r_addr),
+    .deven(gpio0_r_en),
+    .devaddr(),
+    .busy(gpio0_busy)
+);
+
+gpio gpio0 (
+    .clk(cpuclk),
+    .wen(gpio0_w_en),
+    .wdata(bus_w_data[7:0]),
+    .ren(gpio0_r_en),
+    .rdata(gpio0_r_data),
+    .phyin(in0),
+    .phyout(out0)
+);
+
+busdev #(
+    .BASE(28'h0000005),
+    .OFFS(32'h00000050),
+    .MASK(4)
+) term0_w (
+    .n_rst(n_rst && cpuclklocked),
+    .clk(cpuclk),
+    .en(bus_w_en),
+    .addr(bus_w_addr),
+    .deven(term0_en),
+    .devaddr(term0_addr),
+    .busy()
+);
+
+term term0 (
+    .n_rst(n_rst && cpuclklocked && vgaclklocked),
+    .cpuclk(cpuclk),
+    .vgaclk(vgaclk),
+    .addrin(term0_addr[3:2]),
+    .datain(bus_w_data[7:0]),
+    .inen(term0_en),
+    .busy(),
+    .vidlm(vidlm),
+    .vidhs(vidhs),
+    .vidvs(vidvs)
 );
 
 busdev #(
@@ -128,10 +197,6 @@ busdev #(
     .busy()
 );
 
-wire dbg_read_en;
-wire cpu_data_r_en;
-wire [31:0] cpu_data_r_addr;
-
 busdev #(
     .BASE(20'h00001),
     .OFFS(32'h00001000),
@@ -141,20 +206,9 @@ busdev #(
     .clk(cpuclk),
     .en(bus_r_en),
     .addr(bus_r_addr),
-    .deven(cpu_data_r_en),
-    .devaddr(cpu_data_r_addr),
-    .busy() //    .busy(mem_data_busy)
-);
-
-assign mem_data_r_en = cpu_data_r_en || dbg_read_en;
-assign mem_data_r_addr = !printbusy ? cpu_data_r_addr : 12'hffc;
-
-gpio gpio_a (
-    .clk(cpuclk),
-    .w_en(gpio_a_en),
-    .w_addr(gpio_a_addr),
-    .w_data(bus_w_data),
-    .out(aout)
+    .deven(mem_data_r_en),
+    .devaddr(mem_data_r_addr),
+    .busy(mem_data_busy)
 );
 
 memory #(
@@ -164,24 +218,36 @@ memory #(
     .clk(cpuclk),
     .r_en(mem_data_r_en),
     .r_addr(mem_data_r_addr),
-    .r_data(bus_r_data), // add devmux when attaching more than 1 device
+    .r_data(mem_data_r_data),
+    .r_bmul(bus_r_bmul),
     .w_en(mem_data_w_en),
     .w_addr(mem_data_w_addr),
     .w_data(bus_w_data),
+    .w_bmul(bus_w_bmul),
     .state()
+);
+
+busmux2 r_mux (
+    .busy1(gpio0_busy),
+    .busy2(mem_data_busy),
+    .src1({24'b0, gpio0_r_data}),
+    .src2(mem_data_r_data),
+    .out(bus_r_data)
 );
 
 memory #(
     .NAME("PROG"), 
-    .INIT_FILE("init_void.mem")
+    .INIT_FILE("init_empty.mem")
 ) mem_instr (
     .clk(cpuclk),
     .r_en(mem_instr_r_en),
     .r_addr(mem_instr_r_addr),
     .r_data(mem_instr_r_data),
+    .r_bmul(),
     .w_en(mem_instr_w_en),
     .w_addr(mem_instr_w_addr),
     .w_data(mem_instr_w_data),
+    .w_bmul(),
     .state()
 );
 
@@ -189,7 +255,7 @@ wire [3:0] dbg_state;
 assign led0 = dbg_state[0];
 assign led1 = dbg_state[1];
 assign led2 = dbg_state[2];
-//assign led3 = dbg_state[3];
+assign led3 = dbg_state[3];
 
 core cpu1 (
     .clk(cpuclk),
@@ -203,12 +269,14 @@ core cpu1 (
     .mem_data_r_en(bus_r_en),
     .mem_data_r_addr(bus_r_addr),
     .mem_data_r_data(bus_r_data),
+    .mem_data_r_bmul(bus_r_bmul),
     .mem_data_w_en(bus_w_en),
     .mem_data_w_addr(bus_w_addr),
     .mem_data_w_data(bus_w_data),
+    .mem_data_w_bmul(bus_w_bmul),
     .dbg_state(dbg_state),    
-    .dbg_data(dbg_reg_out),
-    .dbg_sel(dbg_sel[4:0]),
+    .dbg_data(dbg_out),
+    .dbg_sel(dbg_sel),
     .clk_enable(clk_enable),
     .cycle_end(cycle_end)
 );
@@ -250,13 +318,11 @@ dbgtouart dbguart (
     .uartbusy(uartbusy),
     .busy(printbusy),
     .dbgsel(dbg_sel),
-    .dbgreaden(dbg_read_en),
+    .dbgreaden(),
     .dbgout(dbg_out),
     .charout(charin),
     .uarttxen(uarttxen)
 );
-
-wire [7:0] dbg_mem_page;
 
 uarttoctl ctluart (
     .n_rst(n_rst && cpuclklocked),
@@ -270,19 +336,15 @@ uarttoctl ctluart (
     .cpurst(cpurst),
     .cpuprint(uartprint),
     .freeze(freeze),
-    .dvpage(dbg_mem_page),
+    .dvpage(),
     .pvpage(),
     .progen(mem_instr_w_en),
     .progaddr(mem_instr_w_addr),
     .progdata(mem_instr_w_data)
 );
 
-dbgsel dbgsrcsel (
-    .selregmem(dbg_sel[5]),
-    .dbgreaden(dbg_read_en),
-    .regin(dbg_reg_out),
-    .datain(bus_r_data),
-    .dbgout(dbg_out)
-);
+assign vidr = {5{vidlm}};
+assign vidg = {6{vidlm}};
+assign vidb = {5{vidlm}};
 
 endmodule
