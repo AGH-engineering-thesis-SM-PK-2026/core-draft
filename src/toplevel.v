@@ -60,10 +60,10 @@ debounce debouncet (
 
 // Instruction memory bus
 wire            mem_instr_r_en;
-wire    [31:0]  mem_instr_r_addr;
+wire    [11:0]  mem_instr_r_addr;
 wire    [31:0]  mem_instr_r_data;
 wire            mem_instr_w_en;
-wire    [31:0]  mem_instr_w_addr;
+wire    [11:0]  mem_instr_w_addr;
 wire    [31:0]  mem_instr_w_data;
 
 wire            bus_r_en;
@@ -79,16 +79,17 @@ wire            gpio0_r_en;
 wire            gpio0_w_en;
 wire    [7:0]   gpio0_r_data;
 wire    [7:0]   gpio0_w_data;
+wire            gpio0_busy;
 
 wire            term0_en;
 wire    [3:0]   term0_addr;
 
 // Data memory bus
 wire            mem_data_r_en;
-wire    [31:0]  mem_data_r_addr;
+wire    [11:0]  mem_data_r_addr;
 wire    [31:0]  mem_data_r_data;
 wire            mem_data_w_en;
-wire    [31:0]  mem_data_w_addr;
+wire    [11:0]  mem_data_w_addr;
 wire            mem_data_busy;
 
 // Debug bus
@@ -123,8 +124,6 @@ busdev #(
     .OFFS(32'h00000010),
     .MASK(4)
 ) gpio0_w (
-    .n_rst(n_rst && cpuclklocked),
-    .clk(cpuclk),
     .en(bus_w_en),
     .addr(bus_w_addr),
     .deven(gpio0_w_en),
@@ -137,8 +136,6 @@ busdev #(
     .OFFS(32'h00000010),
     .MASK(4)
 ) gpio0_r (
-    .n_rst(n_rst && cpuclklocked),
-    .clk(cpuclk),
     .en(bus_r_en),
     .addr(bus_r_addr),
     .deven(gpio0_r_en),
@@ -161,14 +158,14 @@ busdev #(
     .OFFS(32'h00000050),
     .MASK(4)
 ) term0_w (
-    .n_rst(n_rst && cpuclklocked),
-    .clk(cpuclk),
     .en(bus_w_en),
     .addr(bus_w_addr),
     .deven(term0_en),
     .devaddr(term0_addr),
     .busy()
 );
+
+wire vidlm;
 
 term term0 (
     .n_rst(n_rst && cpuclklocked && vgaclklocked),
@@ -188,8 +185,6 @@ busdev #(
     .OFFS(32'h00001000),
     .MASK(12)
 ) mem_data_w (
-    .n_rst(n_rst && cpuclklocked),
-    .clk(cpuclk),
     .en(bus_w_en),
     .addr(bus_w_addr),
     .deven(mem_data_w_en),
@@ -202,8 +197,6 @@ busdev #(
     .OFFS(32'h00001000),
     .MASK(12)
 ) mem_data_r (
-    .n_rst(n_rst && cpuclklocked),
-    .clk(cpuclk),
     .en(bus_r_en),
     .addr(bus_r_addr),
     .deven(mem_data_r_en),
@@ -243,11 +236,11 @@ memory #(
     .r_en(mem_instr_r_en),
     .r_addr(mem_instr_r_addr),
     .r_data(mem_instr_r_data),
-    .r_bmul(),
+    .r_bmul(2'b10),
     .w_en(mem_instr_w_en),
     .w_addr(mem_instr_w_addr),
     .w_data(mem_instr_w_data),
-    .w_bmul(),
+    .w_bmul(2'b10),
     .state()
 );
 
@@ -263,9 +256,6 @@ core cpu1 (
     .mem_instr_r_en(mem_instr_r_en),
     .mem_instr_r_addr(mem_instr_r_addr),
     .mem_instr_r_data(mem_instr_r_data),
-    .mem_instr_w_en(),
-    .mem_instr_w_addr(),
-    .mem_instr_w_data(),
     .mem_data_r_en(bus_r_en),
     .mem_data_r_addr(bus_r_addr),
     .mem_data_r_data(bus_r_data),

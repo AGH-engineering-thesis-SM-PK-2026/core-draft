@@ -8,8 +8,6 @@ module busdev #(
     OFFS = 32'h00000000,
     MASK = 4
 ) (
-    input wire n_rst,
-    input wire clk,
     input wire en,
     input wire [31:0] addr,
     output wire deven,

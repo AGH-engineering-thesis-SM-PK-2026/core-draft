@@ -47,10 +47,6 @@ module core (
     output      [31:0]  mem_instr_r_addr,   // 32-bit address
     input       [31:0]  mem_instr_r_data,   // 32-bits of data
 
-    output reg          mem_instr_w_en,     // write enable
-    output reg  [31:0]  mem_instr_w_addr,   // 32-bit address, hardwired to PC
-    output reg  [31:0]  mem_instr_w_data,   // 32-bits of data
-
     // Data memory interface
     output reg          mem_data_r_en,      // read enable
     output reg  [31:0]  mem_data_r_addr,    // 32-bit address

@@ -25,17 +25,17 @@ module memory #(
     parameter NAME              = "",
     parameter MEMORY_SIZE_WORDS = 1024,                     // Memory size in 32-bit words
     parameter INIT_FILE         = "",                       // Path to memory initialization file. Zero-initialized if none is provided.
-    parameter ADDR_WIDTH        = $clog2(MEMORY_SIZE_WORDS) // Memory bus size. By default, the size needed to address MEMORY_SIZE_WORDS.
+    parameter ADDR_WIDTH        = $clog2(MEMORY_SIZE_WORDS*4) // Memory bus size. By default, the size needed to address MEMORY_SIZE_WORDS.
 ) (
     input               clk,
 
     input               r_en,   // read enable
-    input       [31:0]  r_addr, // 32-bit address
-    output reg  [31:0]  r_data, // 32-bits of data
+    input       [ADDR_WIDTH-1:0]  r_addr, // 32-bit address
+    output      [31:0]  r_data, // 32-bits of data
     input        [1:0]  r_bmul, // how many bytes (0->1, 1->2, 2->4)
 
     input               w_en,   // write enable
-    input       [31:0]  w_addr, // 32-bit address
+    input       [ADDR_WIDTH-1:0]  w_addr, // 32-bit address
     input       [31:0]  w_data, // 32-bits of data
     input        [1:0]  w_bmul, // how many bytes (0->1, 1->2, 2->4)
 
@@ -46,24 +46,40 @@ module memory #(
 reg     [31:0]  mem [0:MEMORY_SIZE_WORDS-1];
 
 
-wire    [29:0]  r_addr_wrd;
+wire    [ADDR_WIDTH-3:0]  r_addr_wrd;
 wire    [1:0]   r_addr_offset;
-wire    [29:0]  w_addr_wrd;
+wire    [ADDR_WIDTH-3:0]  w_addr_wrd;
 wire    [1:0]   w_addr_offset;
 
-assign r_addr_wrd       = r_addr[ADDR_WIDTH+2:2];
+assign r_addr_wrd       = r_addr[ADDR_WIDTH-1:2];
 assign r_addr_offset    = r_addr[1:0];
-assign w_addr_wrd       = w_addr[ADDR_WIDTH+2:2];
+assign w_addr_wrd       = w_addr[ADDR_WIDTH-1:2];
 assign w_addr_offset    = w_addr[1:0];
 
-//reg [3:0] w_strb;
+wire [3:0] w_strb;
 
-//always @(*) begin
-//    case (w_bmul)
-//    2'b00: w_strb = 1<<w_addr_offset;
-//    2'b10: w_strb = 4'b1111;
-//    endcase
-//end
+wbmul i_wbmul (
+    .bmul(w_bmul),
+    .boff(w_addr_offset),
+    .strb(w_strb)
+);
+
+wire [31:0] w_data_align;
+reg [31:0] r_data_unalign;
+
+rdconv i_rdconv (
+    .bmul(r_bmul),
+    .aoff(r_addr_offset),
+    .in(r_data_unalign),
+    .out(r_data)
+);
+
+wdconv i_wdconv (
+    .bmul(w_bmul),
+    .boff(w_addr_offset),
+    .in(w_data),
+    .out(w_data_align)
+);
 
 integer i;
 always @(posedge clk) begin
@@ -77,24 +93,24 @@ always @(posedge clk) begin
     end else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS)) begin
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
 //        $display("mem %s write out of bounds at [%08h]", NAME, w_addr);
-    end else if ((r_en) && (r_addr_offset != 2'b00)) begin
-        state <= `MEMORY_STATE_ALIGNMENT;
-//        $display("mem %s read unaligned at [%08h]", NAME, r_addr);
-    end else if ((w_en) && (w_addr_offset != 2'b00)) begin
-        state <= `MEMORY_STATE_ALIGNMENT;
-//        $display("mem %s write unaligned at [%08h]", NAME, w_addr);
     end
+//    end else if ((r_en) && (r_addr_offset != 2'b00)) begin
+//        state <= `MEMORY_STATE_ALIGNMENT;
+////        $display("mem %s read unaligned at [%08h]", NAME, r_addr);
+//    end else if ((w_en) && (w_addr_offset != 2'b00)) begin
+//        state <= `MEMORY_STATE_ALIGNMENT;
+////        $display("mem %s write unaligned at [%08h]", NAME, w_addr);
+//    end
     
     // Memory operations
     else if (w_en) begin
-//        for (i=0;i<4;i=i+1) begin
-//            if (w_strb[i]) mem[w_addr_wrd][i*8+:8] <= w_data[i*8+:8];
-//        end
-        mem[w_addr_wrd] <= w_data;
+        for (i=0;i<4;i=i+1) begin
+            if (w_strb[i]) mem[w_addr_wrd][i*8+:8] <= w_data_align[i*8+:8];
+        end
         state <= `MEMORY_STATE_SUCCESS;
     end
     else if (r_en) begin
-        r_data <= mem[r_addr_wrd];
+        r_data_unalign <= mem[r_addr_wrd];
         state <= `MEMORY_STATE_SUCCESS;
     end
 end
