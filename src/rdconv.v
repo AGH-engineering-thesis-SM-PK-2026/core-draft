@@ -7,8 +7,8 @@ module rdconv (
     output reg [31:0] out
 );
 
-wire [1:0] boff = aoff ^ 2'b11;
-wire [1:0] hoff = {aoff[1] ^ 1'b1,1'b0};
+wire [1:0] boff = aoff;
+wire [1:0] hoff = {aoff[1],1'b0};
 
 always @(*) begin
     out = 32'b0;

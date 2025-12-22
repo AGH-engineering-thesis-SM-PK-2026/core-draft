@@ -86,24 +86,11 @@ always @(posedge clk) begin
     // Error checking
     if (r_en && w_en) begin
         state <= `MEMORY_STATE_READ_WRITE;
-//        $display("mem read and write at the same time");
     end else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS)) begin
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-//        $display("mem %s read out of bounds at [%08h]", NAME, r_addr);
     end else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS)) begin
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-//        $display("mem %s write out of bounds at [%08h]", NAME, w_addr);
-    end
-//    end else if ((r_en) && (r_addr_offset != 2'b00)) begin
-//        state <= `MEMORY_STATE_ALIGNMENT;
-////        $display("mem %s read unaligned at [%08h]", NAME, r_addr);
-//    end else if ((w_en) && (w_addr_offset != 2'b00)) begin
-//        state <= `MEMORY_STATE_ALIGNMENT;
-////        $display("mem %s write unaligned at [%08h]", NAME, w_addr);
-//    end
-    
-    // Memory operations
-    else if (w_en) begin
+    end else if (w_en) begin
         for (i=0;i<4;i=i+1) begin
             if (w_strb[i]) mem[w_addr_wrd][i*8+:8] <= w_data_align[i*8+:8];
         end
