@@ -28,69 +28,70 @@
 `define CMU_STATE_AWAIT_TRIG    3       // halted, waiting for trigger
 `define CMU_STATE_STEP          4       // single step in progress
 
-module cmu #(
-    parameter INITIAL_STATE = `CMU_STATE_RUNNING
-) (
+module cmu (
     input               clk_in,
     input               rst_n,
 
     input               cycle_end,      // input signal from the core indicating the end of a full instruction cycle
 
     input               trig_halt,      // halt the core (enter await trigger mode on pulse)
-    input               clock_supress,  // suppress any triggers
+    input               freeze,         // do not allow CPU clocking
 
     input               trig_unhalt,    // unhalt the core (enter normal operation mode on pulse)
     input               trig_cycle,     // trigger single cycle (one full instruction)
     input               trig_step,      // trigger single step (one clock tick)
 
-    output              debug_trig,     // output debug trigger on halt to notify debug interface
-    output              clk_enable      // output clock to the core
+    output        reg   debug_trig,     // output debug trigger on halt to notify debug interface
+    output        reg   clk_enable      // output clock to the core
 );
 
 reg [2:0]   state;
 
-assign debug_trig = (state == `CMU_STATE_HALTED);
-assign clk_enable = (state == `CMU_STATE_RUNNING) || (state == `CMU_STATE_FINISH_CYCLE) || (state == `CMU_STATE_STEP);
-
 always @(posedge clk_in) begin
-    if (!rst_n) begin
-        state <= INITIAL_STATE;
-    end
-    else begin
-        case (state)
-            `CMU_STATE_RUNNING: begin
-                if (trig_halt)
+    debug_trig <= 1'b0;
+    clk_enable <= 1'b0;
+
+    case (state)
+        `CMU_STATE_RUNNING: begin
+            clk_enable <= 1'b1;
+            if (trig_halt)
+                state <= `CMU_STATE_FINISH_CYCLE;
+            if (trig_step || trig_cycle)
+                state <= `CMU_STATE_HALTED;
+        end
+        `CMU_STATE_FINISH_CYCLE: begin
+            // Wait until the current clock cycle is finished
+            clk_enable <= 1'b1;
+            if (cycle_end) begin
+                state <= `CMU_STATE_HALTED;
+            end
+        end
+        `CMU_STATE_HALTED: begin
+            // After halting, wait for one clock cycle to allow debug interface to react
+            debug_trig <= 1'b1;
+            state <= `CMU_STATE_AWAIT_TRIG;
+        end
+        `CMU_STATE_AWAIT_TRIG: begin
+            if (!freeze) begin
+                if (trig_unhalt) begin
+                    state <= `CMU_STATE_RUNNING;
+                end
+                else if (trig_step) begin
+                    state <= `CMU_STATE_STEP;
+                end
+                else if (trig_cycle) begin
                     state <= `CMU_STATE_FINISH_CYCLE;
-            end
-            `CMU_STATE_FINISH_CYCLE: begin
-                // Wait until the current clock cycle is finished
-                if (cycle_end) begin
-                    state <= `CMU_STATE_HALTED;
                 end
             end
-            `CMU_STATE_HALTED: begin
-                // After halting, wait for one clock cycle to allow debug interface to react
-                state <= `CMU_STATE_AWAIT_TRIG;
-            end
-            `CMU_STATE_AWAIT_TRIG: begin
-                if (!clock_supress) begin
-                    if (trig_unhalt) begin
-                        state <= `CMU_STATE_RUNNING;
-                    end
-                    else if (trig_step) begin
-                        state <= `CMU_STATE_STEP;
-                    end
-                    else if (trig_cycle) begin
-                        state <= `CMU_STATE_FINISH_CYCLE;
-                    end
-                end
-            end
-            `CMU_STATE_STEP: begin
-                // After one clock cycle, return to await trigger state
-                state <= `CMU_STATE_AWAIT_TRIG;
-            end
-        endcase
-    end
+        end
+        `CMU_STATE_STEP: begin
+            clk_enable <= 1'b1;
+            // After one clock cycle, return to await trigger state
+            state <= `CMU_STATE_AWAIT_TRIG;
+        end
+    endcase
+    
+    if (!rst_n) state <= `CMU_STATE_RUNNING;
 end
 
 endmodule

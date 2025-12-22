@@ -19,8 +19,8 @@ end
 
 toplevel #(
     .DATA_INIT_FILE("init_data.mem"),
-    //.INSTR_INIT_FILE("init_instr.mem")
-    .INSTR_INIT_FILE("init_instr_fibo.mem")
+//    .INSTR_INIT_FILE("init_instr.mem")
+    .INSTR_INIT_FILE("init_prog_subtest.mem")
 ) top (
     .GLOBAL_CLK_IN(clk),
     .GLOBAL_RST_N(rst_n)

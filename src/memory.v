@@ -11,7 +11,10 @@
 // TODO:
 // - add support for 8-bit and 16-bit access (memory masking)
 // - parametrize error handling (generate)
-// - consider allowing simultaneous R/W
+// - consider allowing simultaneous R/W (tricky, 
+//   would have to ensure that no read and write occur in the same ram block, 
+//   to prevent corruption)
+// - add extra reg buffering for better timing
 
 `define MEMORY_STATE_SUCCESS        2'b00   // No error
 `define MEMORY_STATE_READ_WRITE     2'b01   // Simultaneous read and write error
@@ -19,20 +22,22 @@
 `define MEMORY_STATE_ALIGNMENT      2'b11   // Aliginment error
 
 module memory #(
-    parameter NAME                = "",
+    parameter NAME              = "",
     parameter MEMORY_SIZE_WORDS = 1024,                     // Memory size in 32-bit words
     parameter INIT_FILE         = "",                       // Path to memory initialization file. Zero-initialized if none is provided.
-    parameter ADDR_WIDTH        = $clog2(MEMORY_SIZE_WORDS) // Memory bus size. By default, the size needed to address MEMORY_SIZE_WORDS.
+    parameter ADDR_WIDTH        = $clog2(MEMORY_SIZE_WORDS*4) // Memory bus size. By default, the size needed to address MEMORY_SIZE_WORDS.
 ) (
     input               clk,
 
     input               r_en,   // read enable
-    input       [31:0]  r_addr, // 32-bit address
-    output reg  [31:0]  r_data, // 32-bits of data
+    input       [ADDR_WIDTH-1:0]  r_addr, // 32-bit address
+    output      [31:0]  r_data, // 32-bits of data
+    input        [1:0]  r_bmul, // how many bytes (0->1, 1->2, 2->4)
 
     input               w_en,   // write enable
-    input       [31:0]  w_addr, // 32-bit address
+    input       [ADDR_WIDTH-1:0]  w_addr, // 32-bit address
     input       [31:0]  w_data, // 32-bits of data
+    input        [1:0]  w_bmul, // how many bytes (0->1, 1->2, 2->4)
 
     output reg  [1:0]   state   // memory state (error codes)
 );
@@ -41,45 +46,72 @@ module memory #(
 reg     [31:0]  mem [0:MEMORY_SIZE_WORDS-1];
 
 
-wire    [29:0]  r_addr_wrd;
+wire    [ADDR_WIDTH-3:0]  r_addr_wrd;
 wire    [1:0]   r_addr_offset;
-wire    [29:0]  w_addr_wrd;
+wire    [ADDR_WIDTH-3:0]  w_addr_wrd;
 wire    [1:0]   w_addr_offset;
 
-assign r_addr_wrd       = r_addr[ADDR_WIDTH:2];
+assign r_addr_wrd       = r_addr[ADDR_WIDTH-1:2];
 assign r_addr_offset    = r_addr[1:0];
-assign w_addr_wrd       = w_addr[ADDR_WIDTH:2];
+assign w_addr_wrd       = w_addr[ADDR_WIDTH-1:2];
 assign w_addr_offset    = w_addr[1:0];
 
+wire [3:0] w_strb;
+
+wbmul i_wbmul (
+    .bmul(w_bmul),
+    .boff(w_addr_offset),
+    .strb(w_strb)
+);
+
+wire [31:0] w_data_align;
+reg [31:0] r_data_unalign;
+
+rdconv i_rdconv (
+    .bmul(r_bmul),
+    .aoff(r_addr_offset),
+    .in(r_data_unalign),
+    .out(r_data)
+);
+
+wdconv i_wdconv (
+    .bmul(w_bmul),
+    .boff(w_addr_offset),
+    .in(w_data),
+    .out(w_data_align)
+);
+
+integer i;
 always @(posedge clk) begin
     // Error checking
     if (r_en && w_en) begin
         state <= `MEMORY_STATE_READ_WRITE;
-        $display("mem read and write at the same time");
+//        $display("mem read and write at the same time");
     end else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS)) begin
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-        $display("mem %s read out of bounds at [%08h]", NAME, r_addr);
+//        $display("mem %s read out of bounds at [%08h]", NAME, r_addr);
     end else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS)) begin
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-        $display("mem %s write out of bounds at [%08h]", NAME, w_addr);
-    end else if ((r_en) && (r_addr_offset != 2'b00)) begin
-        state <= `MEMORY_STATE_ALIGNMENT;
-        $display("mem %s read unaligned at [%08h]", NAME, r_addr);
-    end else if ((w_en) && (w_addr_offset != 2'b00)) begin
-        state <= `MEMORY_STATE_ALIGNMENT;
-        $display("mem %s write unaligned at [%08h]", NAME, w_addr);
+//        $display("mem %s write out of bounds at [%08h]", NAME, w_addr);
     end
+//    end else if ((r_en) && (r_addr_offset != 2'b00)) begin
+//        state <= `MEMORY_STATE_ALIGNMENT;
+////        $display("mem %s read unaligned at [%08h]", NAME, r_addr);
+//    end else if ((w_en) && (w_addr_offset != 2'b00)) begin
+//        state <= `MEMORY_STATE_ALIGNMENT;
+////        $display("mem %s write unaligned at [%08h]", NAME, w_addr);
+//    end
     
     // Memory operations
     else if (w_en) begin
-        mem[w_addr_wrd] <= w_data;
+        for (i=0;i<4;i=i+1) begin
+            if (w_strb[i]) mem[w_addr_wrd][i*8+:8] <= w_data_align[i*8+:8];
+        end
         state <= `MEMORY_STATE_SUCCESS;
-        $strobe("mem %s write %0h at [%08h]", NAME, w_data, w_addr);
     end
     else if (r_en) begin
-        r_data <= mem[r_addr_wrd];
+        r_data_unalign <= mem[r_addr_wrd];
         state <= `MEMORY_STATE_SUCCESS;
-        $strobe("mem %s read %0h at [%08h]", NAME, r_data, r_addr);
     end
 end
 
@@ -88,18 +120,6 @@ initial begin
     if (INIT_FILE != "") begin
         $readmemh(INIT_FILE, mem);
     end
-    else begin: CLEAR_MEM
-        integer i;
-        for (i = 0; i < MEMORY_SIZE_WORDS; i = i + 1) mem[i] <= 32'h00000000;
-    end
-end
-
-integer j;
-initial begin
-    #100000;
-    for (j = 0; j < 32; j = j + 8)
-        $display("%08x %08x %08x %08x  %08x %08x %08x %08x", mem[0+j], mem[1+j], mem[2+j], mem[3+j], mem[4+j], mem[5+j], mem[6+j], mem[7+j]);
-    
 end
 
 endmodule
