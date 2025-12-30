@@ -77,17 +77,17 @@ always @(posedge clk_in) begin
                     if (trig_unhalt) begin
                         state <= `CMU_STATE_RUNNING;
                     end
-                    else if (trig_step) begin
-                        state <= `CMU_STATE_STEP;
-                    end
                     else if (trig_cycle) begin
                         state <= `CMU_STATE_FINISH_CYCLE;
+                    end
+                    else if (trig_step) begin
+                        state <= `CMU_STATE_STEP;
                     end
                 end
             end
             `CMU_STATE_STEP: begin
                 // After one clock cycle, return to await trigger state
-                state <= `CMU_STATE_AWAIT_TRIG;
+                state <= `CMU_STATE_HALTED;
             end
         endcase
     end
