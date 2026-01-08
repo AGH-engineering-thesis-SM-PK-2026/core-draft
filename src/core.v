@@ -14,70 +14,65 @@
  *      5. Write Back (WB) - write the result back to the register file
  *****************************************************************************/
 
-// TODO:
-// - Correcly implement reseting in all of the modules
-// - ECALL and EBREAK instructions
-// - FENCE instruction
-// - interrupts
-// - Load/Store half word and byte
-// - check for correct endianness handling
-// - CLOCK ENABLE
 
 `include "opcodes.vh"
 
-`define CORE_STATE_INIT1        4'b1111
-`define CORE_STATE_INIT2        4'b1110
+// Normal operation states
 `define CORE_STATE_FETCH        4'b0001
 `define CORE_STATE_DECODE       4'b0010
 `define CORE_STATE_EXECUTE      4'b0011
 `define CORE_STATE_MEMORY       4'b0100
 `define CORE_STATE_WRITEBACK    4'b0101
-`define CORE_STATE_HALT         4'b1000
-`define CORE_STATE_ERROR        4'b1001
-`define TMP_STATE_FETCH_DELAYED 4'b0110
+
+// Non-normal operation states
+`define CORE_STATE_INIT1        4'b1000
+`define CORE_STATE_INIT2        4'b1001
+`define CORE_STATE_ERROR        4'b1111
 
 module core (
     input               clk,                
     input               rst_n,              // reset on low
-    input               clk_enable,         
-    output reg          cycle_end,          // high on last tick of the step step (WB or INIT stage)
+    input               clk_enable,         // 
+    output              cycle_end,          // high on last tick of the cycle (WB or INIT stage)
+    output reg          breakpoint_hit,     // high when an ebreak instruction is executed
 
     // Instruction memory interface
     output reg          mem_instr_r_en,     // read enable
-    output      [31:0]  mem_instr_r_addr,   // 32-bit address
+    output      [31:0]  mem_instr_r_addr,   // 32-bit address, hardwired to PC
     input       [31:0]  mem_instr_r_data,   // 32-bits of data
 
     // Data memory interface
     output reg          mem_data_r_en,      // read enable
     output reg  [31:0]  mem_data_r_addr,    // 32-bit address
     input       [31:0]  mem_data_r_data,    // 32-bits of data
-    output reg  [1:0]   mem_data_r_bmul,     // maps neatly to funct3
+    output reg  [1:0]   mem_data_r_mode,    // read mode (byte/half-word/word)
 
     output reg          mem_data_w_en,      // write enable
     output reg  [31:0]  mem_data_w_addr,    // 32-bit address
     output reg  [31:0]  mem_data_w_data,    // 32-bits of data
-    output reg  [1:0]   mem_data_w_bmul,     // maps neatly to funct3
+    output reg  [1:0]   mem_data_w_mode,    // write mode (byte/half-word/word)
 
-    // Debug interface, all the outputs are hardwired to the core parts
+    // Debug interface for accessing state and register file
     output      [3:0]   dbg_state,          // state of the core
-    input       [4:0]   dbg_sel,        // debug reg selector
-    output      [31:0]  dbg_data        // debug reg data
+    input       [4:0]   dbg_sel,            // debug reg selector
+    output      [31:0]  dbg_data            // debug reg data
 );
 
-reg     [3:0]   state = `CORE_STATE_INIT1;         // state of the core
-reg     [31:0]  pc;             // program counter
+reg     [3:0]   state;              // state of the core
+reg     [31:0]  pc;                 // program counter
 
-assign mem_instr_r_addr = pc;   // We read from the instruction memory only at the PC address
+assign mem_instr_r_addr = pc;       // We read from the instruction memory only at the PC address
+assign cycle_end = (state == `CORE_STATE_WRITEBACK);
 
-reg     [31:0]  instr;          // buffer for the currently executed instruction
+reg     [31:0]  instr;              // buffer for the currently executed instruction
 
-wire    [6:0]   opcode;         // opcode
-wire    [4:0]   rd;             // destination register
-wire    [2:0]   funct3;         // function code (3 bit)
-wire    [4:0]   rs1;            // source register 1  
-wire    [4:0]   rs2;            // source register 2
-wire    [6:0]   funct7;         // function code (7 bit)
-wire            alu_src_sel;    // source select for ALU (1 - rs2, 0 - immediate)
+wire    [6:0]   opcode;             // opcode
+wire    [4:0]   rd;                 // destination register
+wire    [2:0]   funct3;             // function code (3 bit)
+wire    [4:0]   rs1;                // source register 1  
+wire    [4:0]   rs2;                // source register 2
+wire    [6:0]   funct7;             // function code (7 bit)
+wire            alu_src_sel;        // source select for ALU (1 - rs2, 0 - immediate)
 
 assign opcode       = instr[6:0];
 assign rd           = instr[11:7];
@@ -85,38 +80,35 @@ assign funct3       = instr[14:12];
 assign rs1          = instr[19:15];
 assign rs2          = instr[24:20];
 assign funct7       = instr[31:25];
-assign alu_src_sel  = opcode[5]; // differentiate between R-type and I-type instructions
+assign alu_src_sel  = opcode[5];    // differentiate between R-type and I-type instructions
 
 // regfile interface
+wire            reg_rst_ready;      // register file reset finished
 wire    [31:0]  reg_r_data_1;       // data from the first register
 wire    [31:0]  reg_r_data_2;       // data from the second register
 reg     [31:0]  reg_w_data;         // data to write
 reg             reg_w_en;           // write enable
 
 // imm_decoder interface
-wire    [31:0]  imm;            // immediate value from imm_decoder
+wire    [31:0]  imm;                // immediate value from imm_decoder
 
 // ALU interface
-reg             alu_en;         // ALU enable
-wire    [31:0]  alu_res;        // result of the ALU operation
+reg             alu_en;             // ALU enable
+wire    [31:0]  alu_res;            // result of the ALU operation
 
 // Branch Unit interface
-reg             br_en;          // branch enable
-wire            br_taken;       // branch taken
+reg             br_en;              // branch enable
+wire            br_taken;           // branch taken
 
-assign dbg_state = state;
-
-wire rdy;
-wire cpu_rst_n = rst_n && rdy;
-
+// Debug interface
 wire [31:0] dbg_reg_out;
-
 assign dbg_data = dbg_sel == 1'b0 ? pc : dbg_reg_out;
+assign dbg_state = state;
 
 regfile regfile1 (
     .clk(clk),
     .rst_n(rst_n),
-    .rdy(rdy),
+    .rst_ready(reg_rst_ready),
 
     .r_sel_1(rs1),
     .r_sel_2(rs2),
@@ -158,13 +150,10 @@ branch_unit branch_unit1 (
 );
 
 always @(posedge clk) begin
-    cycle_end <= 1'b0;
-    mem_data_r_en <= 1'b0;
-    mem_data_w_en <= 1'b0;
-    mem_instr_r_en <= 1'b0;
-    reg_w_en <= 1'b0;
-
-    if (clk_enable) begin
+    if (!rst_n) begin
+        state <= `CORE_STATE_INIT1;
+    end
+    else if (clk_enable) begin
         case (state)
             `CORE_STATE_INIT1: begin
                 pc <= 32'h00000000;
@@ -174,12 +163,19 @@ always @(posedge clk) begin
                 reg_w_data <= 1'b0;
                 alu_en <= 1'b0;
                 br_en <= 1'b0;
+                reg_w_en <= 1'b0;
+                breakpoint_hit <= 1'b0;
+                mem_data_r_en <= 1'b0;
+                mem_data_w_en <= 1'b0;
+                mem_data_r_addr <= 32'b0;
+                mem_data_w_addr <= 32'b0;
+                mem_data_w_mode <= 2'b00;
+                mem_data_r_mode <= 2'b00;
                 
-                state <= `CORE_STATE_INIT2;
+                // Wait for the register file to finish resetting
+                state <= reg_rst_ready ? `CORE_STATE_INIT2 : `CORE_STATE_INIT1;
             end
             `CORE_STATE_INIT2: begin
-                // Reset the program counter
-                pc <= 32'h00000000;
                 state <= `CORE_STATE_FETCH;
     
                 // Prepare for fetching the first instruction
@@ -218,18 +214,26 @@ always @(posedge clk) begin
                     end
     
                     `OP_LOAD: begin
-                        // Load instructions, we need to enable the data memory read
+                        // Load instructions, we need to enable the data memory read.
+                        // If we are going to load a byte or half-word, we will handle that in the WB stage.
                         mem_data_r_en <= 1'b1;
-                        mem_data_r_addr <= reg_r_data_1 + imm;
-                        mem_data_r_bmul <= funct3[1:0];
+                        mem_data_r_addr <= (reg_r_data_1 + imm);
+                        case (funct3)
+                            `FUNCT3_LB, `FUNCT3_LBU: mem_data_r_mode <= 2'b00;  // Byte
+                            `FUNCT3_LH, `FUNCT3_LHU: mem_data_r_mode <= 2'b01;  // Half-word
+                            `FUNCT3_LW:              mem_data_r_mode <= 2'b10;  // Word
+                            default:                 mem_data_r_mode <= 2'b10;  // Default to Word
+                        endcase
                         state <= `CORE_STATE_MEMORY;
                     end
                     `OP_STORE: begin
                         // Store instructions, we need to enable the data memory write
                         mem_data_w_en <= 1'b1;
+
                         mem_data_w_addr <= reg_r_data_1 + imm;
                         mem_data_w_data <= reg_r_data_2;
-                        mem_data_w_bmul <= funct3[1:0];
+                        mem_data_w_mode <= funct3;
+
                         state <= `CORE_STATE_MEMORY;
                     end
                     `OP_JAL: begin
@@ -247,8 +251,8 @@ always @(posedge clk) begin
                         //   - set the least significant bit to 0
                         //   - set the PC to the result
                         //   - set the link register to PC + 4
-                        pc  <= (reg_r_data_1 + imm - 4'h4) & 32'hFFFFFFFE;
                         reg_w_data <= (reg_r_data_1 + imm) & 32'hFFFFFFFE + 4;
+                        pc <= (reg_r_data_1 + imm - 4) & 32'hFFFFFFFE;  // (imm - 4) because will increment in the WB stage anyway
                         state <= `CORE_STATE_MEMORY;
                     end
                     `OP_LUI: begin
@@ -263,18 +267,31 @@ always @(posedge clk) begin
                         state <= `CORE_STATE_MEMORY;
                     end
                     `OP_ENVIRONMENT: begin
-                        // ECALL or EBREAK instruction, for now we just halt the core
-                        state <= `CORE_STATE_HALT;
+                        case (imm)
+                            `IMM_ENV_EBREAK: begin
+                                // EBREAK instruction - enter halt state
+                                breakpoint_hit <= 1'b1;
+                                state <= `CORE_STATE_MEMORY;
+                            end
+                            `IMM_ENV_ECALL: begin
+                                // ECALL instruction - in this implementation we just jump to 0x0
+                                pc <= 32'h00000000 - 4;
+                                state <= `CORE_STATE_MEMORY;
+                            end
+                            default: begin
+                                state <= `CORE_STATE_ERROR;
+                            end
+                        endcase
                     end
                     default: // Error state for unsupported opcodes
                         state <= `CORE_STATE_ERROR;
                 endcase
-                cycle_end <= 1'b1;
             end
     
             `CORE_STATE_MEMORY: begin 
                 // Nothing to do here - we just wait for memory operations to complete.
-                // In case of any other instructions, we just pass through this state.
+                // If a breakpoint was hit, we remove the flag now.
+                breakpoint_hit <= 1'b0;
                 state <= `CORE_STATE_WRITEBACK;
             end
     
@@ -287,7 +304,15 @@ always @(posedge clk) begin
                     end
                     `OP_LOAD: begin
                         // Load instruction, we need to write the data from memory into the register file.
-                        reg_w_data <= mem_data_r_data;
+                        // There are multiple load instructions - we may need to sign-extend or zero-extend 
+                        // the data depending on funct3.
+                        case (funct3)
+                            `FUNCT3_LB: reg_w_data <= {{24{mem_data_r_data[7]}}, mem_data_r_data[7:0]};     // Load Byte (sign-extended)
+                            `FUNCT3_LH: reg_w_data <= {{16{mem_data_r_data[15]}}, mem_data_r_data[15:0]};   // Load Half-word (sign-extended)
+                            `FUNCT3_LW: reg_w_data <= mem_data_r_data;                                      // Load Word
+                            `FUNCT3_LBU: reg_w_data <= {24'b0, mem_data_r_data[7:0]};                       // Load Byte (zero-extended)
+                            `FUNCT3_LHU: reg_w_data <= {16'b0, mem_data_r_data[15:0]};                      // Load Half-word (zero-extended)
+                        endcase
                         reg_w_en <= 1'b1;
                     end
                     `OP_JAL, `OP_JALR, `OP_LUI, `OP_AUIPC: begin
@@ -304,28 +329,33 @@ always @(posedge clk) begin
                 // Memory operations, ALU and BU are done by now, we can disable them
                 mem_data_r_en <= 1'b0;
                 mem_data_w_en <= 1'b0;
+                mem_data_r_mode <= 2'b00;
+                mem_data_w_mode <= 2'b00;
                 alu_en <= 1'b0;
                 br_en <= 1'b0;
     
                 // Prepare for fetching the next instruction
                 if (opcode == `OP_BRANCH && br_taken) begin
-                    // Branch taken, we need to update the PC
+                    // If a branch has been taken we load the jump address into the PC
                     pc <= pc + imm;
-                end else begin
-                    // No branch taken, we just increment the PC
+                end
+                else begin
+                    // In any other case we just increment the PC by 4
                     pc <= pc + 4;
                 end
                 mem_instr_r_en <= 1'b1;
                 state <= `CORE_STATE_FETCH;
             end
     
-            `CORE_STATE_ERROR, `CORE_STATE_HALT: begin 
-                // Error or halt state, we do nothing and wait for reset
+            `CORE_STATE_ERROR: begin 
+                // Error state, we do nothing and wait for reset
             end
         endcase
     end
-    
-    if (!cpu_rst_n) state <= `CORE_STATE_INIT1;
+end
+
+initial begin
+    state <= `CORE_STATE_INIT1;
 end
 
 endmodule
