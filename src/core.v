@@ -14,7 +14,7 @@
  *      5. Write Back (WB) - write the result back to the register file
  *****************************************************************************/
 
-
+`include "memory_states.vh"
 `include "opcodes.vh"
 
 // Normal operation states
@@ -28,6 +28,7 @@
 `define CORE_STATE_INIT1        4'b1000
 `define CORE_STATE_INIT2        4'b1001
 `define CORE_STATE_ERROR        4'b1111
+`define CORE_STATE_MEM_ERROR    4'b1110
 
 module core (
     input               clk,                
@@ -35,6 +36,7 @@ module core (
     input               clk_enable,         // 
     output              cycle_end,          // high on last tick of the cycle (WB or INIT stage)
     output reg          breakpoint_hit,     // high when an ebreak instruction is executed
+    output       [3:0]  state_out,          //TODO
 
     // Instruction memory interface
     output reg          mem_instr_r_en,     // read enable
@@ -45,16 +47,17 @@ module core (
     output reg          mem_data_r_en,      // read enable
     output reg  [31:0]  mem_data_r_addr,    // 32-bit address
     input       [31:0]  mem_data_r_data,    // 32-bits of data
-    output reg  [1:0]   mem_data_r_mode,    // read mode (byte/half-word/word)
+    output reg   [1:0]  mem_data_r_mode,    // read mode (byte/half-word/word)
 
     output reg          mem_data_w_en,      // write enable
     output reg  [31:0]  mem_data_w_addr,    // 32-bit address
     output reg  [31:0]  mem_data_w_data,    // 32-bits of data
-    output reg  [1:0]   mem_data_w_mode,    // write mode (byte/half-word/word)
+    output reg   [1:0]  mem_data_w_mode,    // write mode (byte/half-word/word)
+
+    input        [1:0]  mem_data_state,     // memory state (error codes)
 
     // Debug interface for accessing state and register file
-    output      [3:0]   dbg_state,          // state of the core
-    input       [4:0]   dbg_sel,            // debug reg selector
+    input        [4:0]  dbg_sel,            // debug reg selector
     output      [31:0]  dbg_data            // debug reg data
 );
 
@@ -63,6 +66,7 @@ reg     [31:0]  pc;                 // program counter
 
 assign mem_instr_r_addr = pc;       // We read from the instruction memory only at the PC address
 assign cycle_end = (state == `CORE_STATE_WRITEBACK);
+assign state_out = state;
 
 reg     [31:0]  instr;              // buffer for the currently executed instruction
 
@@ -103,7 +107,6 @@ wire            br_taken;           // branch taken
 // Debug interface
 wire [31:0] dbg_reg_out;
 assign dbg_data = dbg_sel == 1'b0 ? pc : dbg_reg_out;
-assign dbg_state = state;
 
 regfile regfile1 (
     .clk(clk),
@@ -356,7 +359,11 @@ always @(posedge clk) begin
                     pc <= pc + 4;
                 end
                 mem_instr_r_en <= 1'b1;
-                state <= `CORE_STATE_FETCH;
+
+                if (mem_data_state != `MEMORY_STATE_OK)
+                    state <= `CORE_STATE_MEM_ERROR;
+                else
+                    state <= `CORE_STATE_FETCH;
             end
     
             `CORE_STATE_ERROR: begin 

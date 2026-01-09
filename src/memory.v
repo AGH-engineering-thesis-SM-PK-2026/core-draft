@@ -5,16 +5,15 @@
  *      Basic BRAM-based, word-addressable memory module for RISC-V core.
  *      Only 32-bit word aligned access is supported. Strobe writes are 
  *      supported.
- *      Only one read or write operation is allowed at a time.
+ *      Priority is given to write operations when both read and write
+ *      are requested in the same cycle.
  *****************************************************************************/
 
 `include "memory_states.vh"
 
 module memory #(
-    parameter NAME              = "",
     parameter MEMORY_SIZE_WORDS = 1024,                         // Memory size in 32-bit words
-    parameter INIT_FILE         = "",                           // Path to memory initialization file. Zero-initialized if none is provided.
-    parameter ADDR_WIDTH        = $clog2(MEMORY_SIZE_WORDS*4)   // Memory bus size. By default, the size needed to address MEMORY_SIZE_WORDS.
+    parameter INIT_FILE         = ""                            // Path to memory initialization file. Zero-initialized if none is provided.
 ) (
     input               clk,
     input               rst_n,
@@ -41,23 +40,23 @@ wire    [1:0]   r_addr_offset;
 wire    [29:0]  w_addr_wrd;
 wire    [1:0]   w_addr_offset;
 
-assign r_addr_wrd       = r_addr[ADDR_WIDTH-1:2];
+assign r_addr_wrd       = r_addr[31:2];
 assign r_addr_offset    = r_addr[1:0];
-assign w_addr_wrd       = w_addr[ADDR_WIDTH-1:2];
+assign w_addr_wrd       = w_addr[31:2];
 assign w_addr_offset    = w_addr[1:0];
 
+// Error checking
 always @(posedge clk) begin
-    if (!rst_n) begin
-        state <= `MEMORY_STATE_SUCCESS;
-    end else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS)) begin
+    if (!rst_n)
+        state <= `MEMORY_STATE_OK;
+    else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS))
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-    end else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS)) begin
+    else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS))
         state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-    end else if ((r_en) && (r_addr_offset != 2'b00)) begin
+    else if ((r_en) && (r_addr_offset != 2'b00))
         state <= `MEMORY_STATE_ALIGNMENT;
-    end else if ((w_en) && (w_addr_offset != 2'b00)) begin
+    else if ((w_en) && (w_addr_offset != 2'b00))
         state <= `MEMORY_STATE_ALIGNMENT;
-    end
 end
 
 always @(posedge clk) begin
@@ -65,14 +64,15 @@ always @(posedge clk) begin
         r_data <= 32'b0;
     end
     else if (clk_enable) begin
-        // Error checking
         if (w_en) begin
+            // Write operation with byte strobes
             if(w_strb[0]) mem[w_addr_wrd][7:0] <= w_data[7:0];
             if(w_strb[1]) mem[w_addr_wrd][15:8] <= w_data[15:8];
             if(w_strb[2]) mem[w_addr_wrd][23:16] <= w_data[23:16];
             if(w_strb[3]) mem[w_addr_wrd][31:24] <= w_data[31:24];
         end
         else if (r_en) begin
+            // Read operation
             r_data <= mem[r_addr_wrd];
         end
     end

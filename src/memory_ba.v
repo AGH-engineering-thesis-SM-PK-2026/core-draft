@@ -2,21 +2,16 @@
  *  Author: Piotr Kadziela
  *  Description:
  *      Byte-addressable memory module for RISC-V core.
- *      This module serves as an interface between the core and a word-addressable
- *      memory module, handling byte-level addressing and write strobes.
+ *      This module serves as an interface between the MCU core and a 
+ *      word-addressable memory module, handling byte-level addressing and 
+ *      write strobes.
  *****************************************************************************/
 
 `include "memory_states.vh"
 
-`define MODE_SB  2'b00   // load/store byte
-`define MODE_SH  2'b01   // load/store half-word
-`define MODE_SW  2'b10   // load/store word
-
 module memory_ba #(
-    parameter NAME              = "",
     parameter MEMORY_SIZE_WORDS = 1024,                         // Memory size in 32-bit words
-    parameter INIT_FILE         = "",                           // Path to memory initialization file. Zero-initialized if none is provided.
-    parameter ADDR_WIDTH        = $clog2(MEMORY_SIZE_WORDS*4)   // Memory bus size. By default, the size needed to address MEMORY_SIZE_WORDS.
+    parameter INIT_FILE         = ""                            // Path to memory initialization file. Zero-initialized if none is provided.
 ) (
     input               clk,
     input               rst_n,
@@ -41,10 +36,8 @@ reg      [3:0]  w_strb;
 reg             error_flag;
 
 memory #(
-    .NAME(NAME),
     .MEMORY_SIZE_WORDS(MEMORY_SIZE_WORDS),
-    .INIT_FILE(INIT_FILE),
-    .ADDR_WIDTH(ADDR_WIDTH)
+    .INIT_FILE(INIT_FILE)
 ) mem_wa (
     .clk(clk),
     .rst_n(rst_n),
