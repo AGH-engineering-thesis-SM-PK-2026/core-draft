@@ -33,7 +33,7 @@
 module core (
     input               clk,                
     input               rst_n,              // reset on low
-    input               clk_enable,         // 
+    input               clk_enable,         //TODO
     output              cycle_end,          // high on last tick of the cycle (WB or INIT stage)
     output reg          breakpoint_hit,     // high when an ebreak instruction is executed
     output       [3:0]  state_out,          //TODO
@@ -57,8 +57,8 @@ module core (
     input        [1:0]  mem_data_state,     // memory state (error codes)
 
     // Debug interface for accessing state and register file
-    input        [4:0]  dbg_sel,            // debug reg selector
-    output      [31:0]  dbg_data            // debug reg data
+    input        [4:0]  dbg_reg_sel,        // debug reg selector
+    output      [31:0]  dbg_reg_data        // debug reg data
 );
 
 reg     [3:0]   state;              // state of the core
@@ -106,7 +106,7 @@ wire            br_taken;           // branch taken
 
 // Debug interface
 wire [31:0] dbg_reg_out;
-assign dbg_data = dbg_sel == 1'b0 ? pc : dbg_reg_out;
+assign dbg_reg_data = (dbg_reg_sel == 5'b00000 ? pc : dbg_reg_out);
 
 regfile regfile1 (
     .clk(clk),
@@ -122,7 +122,7 @@ regfile regfile1 (
     .w_sel(rd),
     .w_data(reg_w_data),
     
-    .dbg_reg_sel(dbg_sel),
+    .dbg_reg_sel(dbg_reg_sel),
     .dbg_reg_data(dbg_reg_out)
 );
 

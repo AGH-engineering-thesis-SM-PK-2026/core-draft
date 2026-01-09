@@ -1,30 +1,26 @@
 `timescale 1ns / 1ps
 
 module toplevel (
-    input               sysclk,
-    input               btnrst,
-    input               btntrig,
-    input               uartin,
-    output              uartout,
-    output              led0,
-    output              led1,
-    output              led2,
-    output              led3,
-    input   [7:0]       in0,
-    output  [7:0]       out0,
-    output  [4:0]       vidr,
-    output  [5:0]       vidg,
-    output  [4:0]       vidb,
-    output              vidhs,
-    output              vidvs
+    input               sysclk,         // System clock input
+    input               btnrst,         // Button to reset the CPU (active high)
+    input               btntrig,        // Button to trigger debug print (active high)
+    input               uartin,         // Debug UART receive line
+    output              uartout,        // Debug UART transmit line
+    output              led0,           //  \
+    output              led1,           //  | LED indicators for CPU state
+    output              led2,           //  |
+    output              led3,           //  /
+    input   [7:0]       in0,            // GPIO input
+    output  [7:0]       out0,           // GPIO output
+    output  [4:0]       vidr,           // VGA red
+    output  [5:0]       vidg,           // VGA green
+    output  [4:0]       vidb,           // VGA blue
+    output              vidhs,          // VGA hsync
+    output              vidvs           // VGA vsync
 );
 
 wire n_rst = !btnrst;
-
-
-
 wire btnprint;
-wire printbusy;
 
 debounce debouncet (
     .n_rst(n_rst && cpuclklocked),
@@ -54,43 +50,26 @@ wire     [1:0]  bus_w_mode;
 
 wire     [1:0]  bus_state;
 
-
 // Debug bus
-wire    [31:0]  dbg_out;
-wire     [4:0]  dbg_sel;
+wire    [31:0]  dbg_reg_data;
+wire     [4:0]  dbg_reg_sel;
 
-wire            cpubreak;
-wire            cpuhalt;
-wire            cpustart;
-wire            cpustep;
-wire            cpucycle;
 wire            dbg_force_rst;
-wire            dbg_force_halt;
+
+wire            dbg_trig_halt;
+wire            dbg_trig_unhalt;
+wire            dbg_trig_cycle;
+wire            dbg_trig_step;
+wire            dbg_suppress_clock;
 
 /********************************
- *   CMU AND CLOCK GENERATION   *
+ *   CLOCK GENERATION AND CMU   *
  ********************************/
-wire            clk_enable;     // If MCU core should be running
-wire            cycle_end;      // High before entering new instruction cycle (WB or INIT stage)
 
 wire            cpuclk;         // MCU clock
 wire            cpuclklocked;   // MCU clock locked signal (PLL in sync)
 wire            vgaclk;         // VGA clock
 wire            vgaclklocked;   // VGA clock locked signal (PLL in sync)
-
-
-cmu cmu1 (
-    .clk_in(cpuclk),
-    .rst_n(n_rst && cpuclklocked),
-    .trig_halt(cpuhalt || cpubreak),
-    .clock_supress(dbg_force_halt || printbusy),
-    .trig_unhalt(cpustart),
-    .trig_cycle(cpucycle),
-    .trig_step(cpustep),
-    .cycle_end(cycle_end),
-    .clk_enable(clk_enable),
-    .debug_trig()
-);
 
 // CLOCK DOWNSCALERS
 prescaler #(
@@ -113,11 +92,34 @@ prescaler #(
     .locked(vgaclklocked)
 );
 
+// CLOCK MANAGEMENT UNIT
+wire            cycle_end;
+wire            clk_enable;
+wire            cpu_breakpoint;
+
+cmu cmu1 (
+    .clk_in(cpuclk),
+    .rst_n(n_rst && cpuclklocked),
+    .trig_halt(dbg_trig_halt || cpubreak),
+    .clock_supress(dbg_suppress_clock),
+    .trig_unhalt(dbg_trig_unhalt),
+    .trig_cycle(dbg_trig_cycle),
+    .trig_step(dbg_trig_step),
+    .cycle_end(cycle_end),
+    .clk_enable(clk_enable),
+    .debug_trig()
+);
+
 /********************************
  *           MCU CORE           *
  ********************************/
 
 wire    [3:0] cpu_state;
+
+assign led0 = cpu_state[0];
+assign led1 = cpu_state[1];
+assign led2 = cpu_state[2];
+assign led3 = cpu_state[3];
 
 core cpu1 (
     .clk(cpuclk),
@@ -138,24 +140,18 @@ core cpu1 (
     .mem_data_w_data(bus_w_data),
     .mem_data_w_mode(bus_w_mode),
     .mem_data_state(bus_state),
-    .dbg_data(dbg_out),
-    .dbg_sel(dbg_sel)
+    .dbg_reg_data(dbg_reg_data),
+    .dbg_reg_sel(dbg_reg_sel)
 );
 
-assign led0 = cpu_state[0];
-assign led1 = cpu_state[1];
-assign led2 = cpu_state[2];
-assign led3 = cpu_state[3];
-
 // Instruction memory
-
 memory #(
-    .MEMORY_SIZE_WORDS(1024),       // 4KB instruction memory
+    .MEMORY_SIZE_WORDS(1024),       // 4KB
     .INIT_FILE("init_instr_3d.mem")
 ) mem_instr (
     .clk(cpuclk),
     .rst_n(n_rst && cpuclklocked),
-    .clk_enable(1'b1),  // Instruction memory always enabled to allow programming
+    .clk_enable(1'b1),              // Instruction memory always enabled to allow programming
     .r_en(mem_instr_r_en),
     .r_addr(mem_instr_r_addr),
     .r_data(mem_instr_r_data),
@@ -165,7 +161,6 @@ memory #(
     .w_strb(4'b1111),
     .state()
 );
-
 
 /********************************
  *   DATA BUS AND PERIPHERALS   *
@@ -260,10 +255,9 @@ gpio gpio0 (
 );
 
 // Terminal device
-wire vidlm;
-
-wire term0_deven;
-wire [31:0] term0_devaddr;
+wire            vidlm;
+wire            term0_deven;
+wire    [31:0]  term0_devaddr;
 
 busdev #(
     .BASE(28'h0000005),
@@ -301,6 +295,7 @@ assign bus_r_data = gpio0_r_data | mem_data_r_data;
  *        DEBUG INTERFACE       *
  ********************************/
 
+wire printbusy;
 wire uartprint;
 
 wire uartbusy;
@@ -336,33 +331,37 @@ uartrx #(
 dbgtouart dbguart (
     .n_rst(n_rst && cpuclklocked),
     .clk(cpuclk),
-    .trig(btnprint || uartprint),
+    .trig(print_trig_btn || uartprint),
     .uartbusy(uartbusy),
     .busy(printbusy),
-    .dbgsel(dbg_sel),
+    .dbgsel(dbg_reg_sel),
     .dbgreaden(),
-    .dbgout(dbg_out),
+    .dbgout(dbg_reg_data),
     .charout(charin),
     .uarttxen(uarttxen)
 );
+
+wire ctluart_freeze;
 
 uarttoctl ctluart (
     .n_rst(n_rst && cpuclklocked),
     .clk(cpuclk),
     .charin(charout),
     .uartdone(uartdone),
-    .cpuhalt(cpuhalt),
-    .cpustart(cpustart),
-    .cpustep(cpustep),
-    .cpucycle(cpucycle),
+    .cpuhalt(dbg_trig_halt),
+    .cpustart(dbg_trig_unhalt),
+    .cpustep(dbg_trig_step),
+    .cpucycle(dbg_trig_cycle),
     .cpurst(dbg_force_rst),
     .cpuprint(uartprint),
-    .freeze(dbg_force_halt),
+    .freeze(ctluart_freeze),
     .dvpage(),
     .pvpage(),
     .progen(mem_instr_w_en),
     .progaddr(mem_instr_w_addr),
     .progdata(mem_instr_w_data)
 );
+
+assign dbg_suppress_clock = ctluart_freeze || printbusy;
 
 endmodule
