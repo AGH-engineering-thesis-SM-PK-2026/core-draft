@@ -5,10 +5,6 @@
  *      Arithmetic Logic Unit (ALU) for RISC-V core.
  *****************************************************************************/
 
-// TODO:
-// - Add states for ALU operations (error handling)
-// - Check for correct handling of arguments (eg. shift amounts, etc.)
-
 `include "opcodes.vh"
 
 module alu (
@@ -25,7 +21,6 @@ module alu (
 );
 
 wire    [31:0]  op_a;
-wire signed [31:0] op_as;
 wire    [31:0]  op_b;
 wire    [4:0]   shamt;          // shift amount - lower 5 bits of the second operand for shift operations
 wire            alt_action;     // alternate action for current funct3, eg. sub instead of add
@@ -33,49 +28,42 @@ wire            alt_action;     // alternate action for current funct3, eg. sub 
 assign op_a = reg_data_1;
 assign op_b = src_sel ? reg_data_2 : immediate;
 assign shamt = op_b[4:0];
-assign alt_action = funct7 == `FUNCT7_SUB_SRA;
+assign alt_action = (funct7 == `FUNCT7_SUB_SRA);
 
 always @* begin
     if(alu_en) begin
         case (funct3)
             `FUNCT3_ADD_SUB: begin
-                if (alt_action && src_sel) begin     // Subtraction
+                if (alt_action && src_sel)  // Subtraction
                     alu_res = op_a - op_b;
-                    $display("alu %0d - %0d = %0d", op_a, op_b, alu_res);
-                end else begin           // Addition
+                else                        // Addition
                     alu_res = op_a + op_b;
-                    $display("alu %0d + %0d = %0d", op_a, op_b, alu_res);
-                end
             end
-            `FUNCT3_AND: begin           // Bitwise AND
+            `FUNCT3_AND: begin              // Bitwise AND
                 alu_res = op_a & op_b;
-                $display("alu %0d & %0d = %0d", op_a, op_b, alu_res);
             end
-            `FUNCT3_OR: begin            // Bitwise OR
+            `FUNCT3_OR: begin               // Bitwise OR
                 alu_res = op_a | op_b;
-                $display("alu %0d | %0d = %0d", op_a, op_b, alu_res);
             end
-            `FUNCT3_XOR: begin           // Bitwise XOR
+            `FUNCT3_XOR: begin              // Bitwise XOR
                 alu_res = op_a ^ op_b;
-                $display("alu %0d ^ %0d = %0d", op_a, op_b, alu_res);
             end
-            `FUNCT3_SLL: begin           // Shift Left Logical (fill with 0)
+            `FUNCT3_SLL: begin              // Shift Left Logical (fill with 0)
                 alu_res = op_a << shamt;
-                $display("alu %0d << %0d = %0d", op_a, shamt, alu_res);
             end
             `FUNCT3_SRL_SRA: begin
-                if (alt_action) alu_res = $signed(op_a) >>> shamt;
-                else alu_res = op_a >> shamt;
+                if (alt_action)             // Shift Right Arithmetic (fill with sign bit)
+                    alu_res = $signed(op_a) >>> shamt;
+                else                        // Shift Right Logical (fill with 0)
+                    alu_res = op_a >> shamt;
             end
-            `FUNCT3_SLT: begin           // Set Less Than (set to 1 if op_a < op_b)
+            `FUNCT3_SLT: begin              // Set Less Than (set to 1 if op_a < op_b)
                 alu_res = ($signed(op_a) < $signed(op_b)) ? 32'b1 : 32'b0;
-                $display("alu %0d < %0d = %0d (signed)", op_a, op_b, alu_res);
             end
-            `FUNCT3_SLTU: begin          // Set Less Than Unsigned (set to 1 if op_a < op_b)
+            `FUNCT3_SLTU: begin             // Set Less Than Unsigned (set to 1 if op_a < op_b)
                 alu_res = (op_a < op_b) ? 32'b1 : 32'b0;
-                $display("alu %0d < %0d = %0d (unsigned)", op_a, op_b, alu_res);
             end
-            default:                // Default case to prevent latches
+            default:                    // Default case to prevent latches
                 alu_res = 32'b0;
         endcase
     end

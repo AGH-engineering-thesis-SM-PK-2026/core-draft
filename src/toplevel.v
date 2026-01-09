@@ -60,41 +60,42 @@ debounce debouncet (
 
 // Instruction memory bus
 wire            mem_instr_r_en;
-wire    [11:0]  mem_instr_r_addr;
+wire    [31:0]  mem_instr_r_addr;
 wire    [31:0]  mem_instr_r_data;
 wire            mem_instr_w_en;
-wire    [11:0]  mem_instr_w_addr;
+wire    [31:0]  mem_instr_w_addr;
 wire    [31:0]  mem_instr_w_data;
 
+// Data memory bus signals
 wire            bus_r_en;
 wire    [31:0]  bus_r_addr;
 wire    [31:0]  bus_r_data;
-wire    [1:0]   bus_r_bmul;
+wire     [1:0]  bus_w_mode;
 wire            bus_w_en;
 wire    [31:0]  bus_w_addr;
 wire    [31:0]  bus_w_data;
-wire    [1:0]   bus_w_bmul;
+wire     [1:0]  bus_r_mode;
 
 wire            gpio0_r_en;
 wire            gpio0_w_en;
-wire    [7:0]   gpio0_r_data;
-wire    [7:0]   gpio0_w_data;
+wire     [7:0]  gpio0_r_data;
+wire     [7:0]  gpio0_w_data;
 wire            gpio0_busy;
 
-wire            term0_en;
-wire    [3:0]   term0_addr;
-
-// Data memory bus
+// Data memory (BRAM side) bus signals
 wire            mem_data_r_en;
-wire    [11:0]  mem_data_r_addr;
+wire    [31:0]  mem_data_r_addr;
 wire    [31:0]  mem_data_r_data;
 wire            mem_data_w_en;
-wire    [11:0]  mem_data_w_addr;
-wire            mem_data_busy;
+wire    [31:0]  mem_data_w_addr;
+wire    [31:0]  mem_data_w_data;
+
+wire            term0_en;
+wire     [3:0]  term0_addr;
 
 // Debug bus
 wire    [31:0]  dbg_out;
-wire    [4:0]   dbg_sel;
+wire     [4:0]  dbg_sel;
 
 wire clk_enable;
 wire cycle_end;
@@ -110,10 +111,10 @@ cmu cmu1 (
     .clk_in(cpuclk),
     .rst_n(n_rst && cpuclklocked),
     .trig_halt(cpuhalt),
+    .clock_supress(freeze || printbusy),
     .trig_unhalt(cpustart),
     .trig_cycle(cpucycle),
     .trig_step(cpustep),
-    .freeze(freeze || printbusy),
     .cycle_end(cycle_end),
     .clk_enable(clk_enable),
     .debug_trig()
@@ -204,43 +205,46 @@ busdev #(
     .busy(mem_data_busy)
 );
 
-memory #(
+memory_ba #(
     .NAME("DATA"), 
     .INIT_FILE("init_data.mem")
 ) mem_data (
     .clk(cpuclk),
+    .rst_n(n_rst && cpuclklocked),
+    .clk_enable(clk_enable),
     .r_en(mem_data_r_en),
     .r_addr(mem_data_r_addr),
-    .r_data(mem_data_r_data),
-    .r_bmul(bus_r_bmul),
+    .r_data(bus_r_data),
+    .r_mode(bus_r_mode),
     .w_en(mem_data_w_en),
     .w_addr(mem_data_w_addr),
     .w_data(bus_w_data),
-    .w_bmul(bus_w_bmul),
+    .w_mode(bus_w_mode),
     .state()
 );
 
-busmux2 r_mux (
-    .busy1(gpio0_busy),
-    .busy2(mem_data_busy),
-    .src1({24'b0, gpio0_r_data}),
-    .src2(mem_data_r_data),
-    .out(bus_r_data)
-);
+//busmux2 r_mux (
+//    .busy1(gpio0_busy),
+//    .busy2(mem_data_busy),
+//    .src1({24'b0, gpio0_r_data}),
+//    .src2(mem_data_r_data),
+//    .out(bus_r_data)
+//);
 
 memory #(
-    .NAME("PROG"), 
-    .INIT_FILE("init_empty.mem")
+    .NAME("PROG"),
+    .INIT_FILE("init_instr_3d.mem")
 ) mem_instr (
     .clk(cpuclk),
+    .rst_n(n_rst && cpuclklocked),
+    .clk_enable(1'b1),  // Instruction memory always enabled to allow programming
     .r_en(mem_instr_r_en),
     .r_addr(mem_instr_r_addr),
     .r_data(mem_instr_r_data),
-    .r_bmul(2'b10),
     .w_en(mem_instr_w_en),
     .w_addr(mem_instr_w_addr),
     .w_data(mem_instr_w_data),
-    .w_bmul(2'b10),
+    .w_strb(4'b1111),
     .state()
 );
 
@@ -253,22 +257,23 @@ assign led3 = dbg_state[3];
 core cpu1 (
     .clk(cpuclk),
     .rst_n(n_rst && cpuclklocked && !cpurst),
+    .clk_enable(clk_enable),
+    .cycle_end(cycle_end),
+    .breakpoint_hit(),  //TODO
     .mem_instr_r_en(mem_instr_r_en),
     .mem_instr_r_addr(mem_instr_r_addr),
     .mem_instr_r_data(mem_instr_r_data),
     .mem_data_r_en(bus_r_en),
     .mem_data_r_addr(bus_r_addr),
     .mem_data_r_data(bus_r_data),
-    .mem_data_r_bmul(bus_r_bmul),
+    .mem_data_r_mode(bus_r_mode),
     .mem_data_w_en(bus_w_en),
     .mem_data_w_addr(bus_w_addr),
     .mem_data_w_data(bus_w_data),
-    .mem_data_w_bmul(bus_w_bmul),
+    .mem_data_w_mode(bus_w_mode),
     .dbg_state(dbg_state),    
     .dbg_data(dbg_out),
-    .dbg_sel(dbg_sel),
-    .clk_enable(clk_enable),
-    .cycle_end(cycle_end)
+    .dbg_sel(dbg_sel)
 );
 
 wire uartbusy;
