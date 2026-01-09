@@ -19,38 +19,27 @@ end
 
 toplevel #(
     .DATA_INIT_FILE("init_data.mem"),
-//    .INSTR_INIT_FILE("init_instr.mem")
-    .INSTR_INIT_FILE("init_prog_subtest.mem")
+    .INSTR_INIT_FILE("init_instr_fibo.mem")
 ) top (
-    .sysclk(clk),
-    .btnrst(!rst_n)
+    .SYS_CLK(clk),
+    .BTN_RST(!rst_n)
 );
 
-
-// .global _boot
-// .text
-// 
-// _boot:                       /* x0   =   0     */
-//      addi x1 , x0,  100      /* x1   =   100   */
-//      addi x2 , x1,  250      /* x2   =   350   */
-//      addi x3 , x2, -100      /* x3   =   250   */
-//      addi x4 , x3, -2000     /* x4   =   -1750 */
-//      addi x5 , x4,  1000     /* x5   =   -750  */
-//      add  x6 , x5, x4        /* x6   =   -2500 */
-// 
-//      sw 	 x6 , 0x0010(x0)    /* DATA_MEM[0x0010] = -2500 */
-//      lw 	 x7 , 0x0010(x0)    /* x7   = -2500 */
-//      addi x7 , x7, 5		    /* x7   = -2495 */
-
-//      instr_data.mem:
-//      06400093
-//      0fa08113
-//      f9c10193
-//      83018213
-//      3e820293
-//      00428333
-//      00602823
-//      01002383
-//      00538393
-
 endmodule
+
+
+// init_instr_fibo.mem
+// Initializes stack and executes this C code:
+
+//  #include <stdint.h>
+//
+//  uint32_t* const MEM_BASE = (uint32_t*) 0x00001000ul;
+//  
+//  void fib_fill() {
+//      MEM_BASE[0] = 1;
+//      MEM_BASE[1] = 1;
+//      for (uint32_t i = 2; i < 1024; i++) 
+//      {
+//          MEM_BASE[i] = MEM_BASE[i-1] + MEM_BASE[i-2];
+//      }
+//  }

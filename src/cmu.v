@@ -37,11 +37,10 @@ module cmu #(
     input               cycle_end,      // input signal from the core indicating the end of a full instruction cycle
 
     input               trig_halt,      // halt the core (enter await trigger mode on pulse)
-    input               clock_supress,  // suppress any triggers
-
     input               trig_unhalt,    // unhalt the core (enter normal operation mode on pulse)
     input               trig_cycle,     // trigger single cycle (one full instruction)
     input               trig_step,      // trigger single step (one clock tick)
+    input               clock_supress,  // suppress unhalt/step/cycle triggers
 
     output              debug_trig,     // output debug trigger on halt to notify debug interface
     output              clk_enable      // output clock to the core
