@@ -30,7 +30,7 @@ module memory_ba #(
     input               w_en,       // write enable
     input       [31:0]  w_addr,     // 32-bit address
     input       [31:0]  w_data,     // 32-bits of data
-    input        [3:0]  w_mode,     // write mode - byte (0'b00), half-word (0'b01), word (0'b10)
+    input        [1:0]  w_mode,     // write mode - byte (0'b00), half-word (0'b01), word (0'b10)
 
     output       [1:0]  state       // memory state (error codes)
 );

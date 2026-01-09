@@ -152,6 +152,18 @@ branch_unit branch_unit1 (
 always @(posedge clk) begin
     if (!rst_n) begin
         state <= `CORE_STATE_INIT1;
+        instr <= 1'b0;
+        reg_w_data <= 1'b0;
+        alu_en <= 1'b0;
+        br_en <= 1'b0;
+        reg_w_en <= 1'b0;
+        breakpoint_hit <= 1'b0;
+        mem_data_r_en <= 1'b0;
+        mem_data_w_en <= 1'b0;
+        mem_data_r_addr <= 32'b0;
+        mem_data_w_addr <= 32'b0;
+        mem_data_w_mode <= 2'b00;
+        mem_data_r_mode <= 2'b00;
     end
     else if (clk_enable) begin
         case (state)

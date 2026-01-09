@@ -60,10 +60,10 @@ debounce debouncet (
 
 // Instruction memory bus
 wire            mem_instr_r_en;
-wire    [11:0]  mem_instr_r_addr;
+wire    [31:0]  mem_instr_r_addr;
 wire    [31:0]  mem_instr_r_data;
 wire            mem_instr_w_en;
-wire    [11:0]  mem_instr_w_addr;
+wire    [31:0]  mem_instr_w_addr;
 wire    [31:0]  mem_instr_w_data;
 
 // Data memory bus signals
@@ -233,7 +233,7 @@ memory_ba #(
 
 memory #(
     .NAME("PROG"),
-    .INIT_FILE("init_instr_fibo.mem")
+    .INIT_FILE("init_instr_3d.mem")
 ) mem_instr (
     .clk(cpuclk),
     .rst_n(n_rst && cpuclklocked),
@@ -257,6 +257,9 @@ assign led3 = dbg_state[3];
 core cpu1 (
     .clk(cpuclk),
     .rst_n(n_rst && cpuclklocked && !cpurst),
+    .clk_enable(clk_enable),
+    .cycle_end(cycle_end),
+    .breakpoint_hit(),  //TODO
     .mem_instr_r_en(mem_instr_r_en),
     .mem_instr_r_addr(mem_instr_r_addr),
     .mem_instr_r_data(mem_instr_r_data),
@@ -270,9 +273,7 @@ core cpu1 (
     .mem_data_w_mode(bus_w_mode),
     .dbg_state(dbg_state),    
     .dbg_data(dbg_out),
-    .dbg_sel(dbg_sel),
-    .clk_enable(clk_enable),
-    .cycle_end(cycle_end)
+    .dbg_sel(dbg_sel)
 );
 
 wire uartbusy;

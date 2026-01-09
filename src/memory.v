@@ -49,40 +49,36 @@ assign w_addr_offset    = w_addr[1:0];
 always @(posedge clk) begin
     if (!rst_n) begin
         state <= `MEMORY_STATE_SUCCESS;
-    //    r_data <= 32'b0;
+    end else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS)) begin
+        state <= `MEMORY_STATE_OUT_OF_BOUNDS;
+    end else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS)) begin
+        state <= `MEMORY_STATE_OUT_OF_BOUNDS;
+    end else if ((r_en) && (r_addr_offset != 2'b00)) begin
+        state <= `MEMORY_STATE_ALIGNMENT;
+    end else if ((w_en) && (w_addr_offset != 2'b00)) begin
+        state <= `MEMORY_STATE_ALIGNMENT;
     end
-    else if (!clk_enable) begin
-        // Do nothing when core is halted
+end
+
+always @(posedge clk) begin
+    if (!rst_n) begin
+        r_data <= 32'b0;
     end
-    else begin
+    else if (clk_enable) begin
         // Error checking
-        if (r_en && w_en) begin
-            state <= `MEMORY_STATE_READ_WRITE;
-        end else if ((r_en) && (r_addr_wrd >= MEMORY_SIZE_WORDS)) begin
-            state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-        end else if ((w_en) && (w_addr_wrd >= MEMORY_SIZE_WORDS)) begin
-            state <= `MEMORY_STATE_OUT_OF_BOUNDS;
-        end else if ((r_en) && (r_addr_offset != 2'b00)) begin
-            state <= `MEMORY_STATE_ALIGNMENT;
-        end else if ((w_en) && (w_addr_offset != 2'b00)) begin
-            state <= `MEMORY_STATE_ALIGNMENT;
-        end
-        else if (w_en) begin
-            mem[w_addr_wrd] <=  (w_strb[0] ? w_data[7:0]   : mem[w_addr_wrd][7:0])   |
-                                (w_strb[1] ? w_data[15:8]  : mem[w_addr_wrd][15:8])  |
-                                (w_strb[2] ? w_data[23:16] : mem[w_addr_wrd][23:16]) |
-                                (w_strb[3] ? w_data[31:24] : mem[w_addr_wrd][31:24]);
-            state <= `MEMORY_STATE_SUCCESS;
+        if (w_en) begin
+            if(w_strb[0]) mem[w_addr_wrd][7:0] <= w_data[7:0];
+            if(w_strb[1]) mem[w_addr_wrd][15:8] <= w_data[15:8];
+            if(w_strb[2]) mem[w_addr_wrd][23:16] <= w_data[23:16];
+            if(w_strb[3]) mem[w_addr_wrd][31:24] <= w_data[31:24];
         end
         else if (r_en) begin
             r_data <= mem[r_addr_wrd];
-            state <= `MEMORY_STATE_SUCCESS;
         end
     end
 end
 
 initial begin
-    state <= `MEMORY_STATE_SUCCESS;
     if (INIT_FILE != "") begin
         $readmemh(INIT_FILE, mem);
     end

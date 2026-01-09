@@ -37,7 +37,7 @@ always @(posedge clk) begin
     if (!rst_n) begin           // Start reset process
         rst_cnt <= 5'b00001;
         reg_data[0] <= 32'b0;   // x0 is always zero, but we still need to set it during reset
-    end 
+    end
     else if (!rst_ready) begin  // During reset, zero registers sequentially
         reg_data[rst_cnt] <= 32'b0;
         rst_cnt <= rst_cnt + 1;
