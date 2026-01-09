@@ -147,7 +147,7 @@ core cpu1 (
 // Instruction memory
 memory #(
     .MEMORY_SIZE_WORDS(1024),       // 4KB
-    .INIT_FILE("init_instr_3d.mem")
+    .INIT_FILE("init_instr_spin.mem")
 ) mem_instr (
     .clk(cpuclk),
     .rst_n(n_rst && cpuclklocked),
@@ -201,7 +201,7 @@ busdev #(
 
 memory_ba #(
     .MEMORY_SIZE_WORDS(1024),       // 4KB
-    .INIT_FILE("init_data.mem")
+    .INIT_FILE("init_data_clear.mem")
 ) mem_data (
     .clk(cpuclk),
     .rst_n(n_rst && cpuclklocked),
