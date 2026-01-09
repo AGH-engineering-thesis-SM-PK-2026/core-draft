@@ -295,73 +295,24 @@ assign bus_r_data = gpio0_r_data | mem_data_r_data;
  *        DEBUG INTERFACE       *
  ********************************/
 
-wire printbusy;
-wire uartprint;
-
-wire uartbusy;
-wire uarttxen;
-wire [7:0] charin;
-
-wire uartdone;
-wire [7:0] charout;
-
-uarttx #(
-    .PREDIV(520) // 9600bps @ f=5MHz
-) dbguarttx (
+dbgtoplevel dbgtop (
     .n_rst(n_rst && cpuclklocked),
-    .clk(cpuclk),
-    .charin(charin),
-    .txen(uarttxen),
-    .busy(uartbusy),
-    .phytx(uartout)
+    .cpuclk(cpuclk),
+    .cpuclklocked(cpuclklocked),
+    .print_trig_btn(print_trig_btn),
+    .dbg_force_rst(dbg_force_rst),
+    .dbg_reg_sel(dbg_reg_sel),
+    .dbg_reg_data(dbg_reg_data),
+    .dbg_trig_halt(dbg_trig_halt),
+    .dbg_trig_unhalt(dbg_trig_unhalt),
+    .dbg_trig_step(dbg_trig_step),
+    .dbg_trig_cycle(dbg_trig_cycle),
+    .dbg_suppress_clock(dbg_suppress_clock),
+    .mem_instr_w_en(mem_instr_w_en),
+    .mem_instr_w_addr(mem_instr_w_addr),
+    .mem_instr_w_data(mem_instr_w_data),
+    .uartout(uartout),
+    .uartin(uartin)
 );
-
-uartrx #(
-    .PREDIV(520), // 9600bps @ f=5MHz
-    .PREMID(250)  // midpoint for sampling
-) ctluartrx (
-    .n_rst(n_rst && cpuclklocked),
-    .clk(cpuclk),
-    .charout(charout),
-    .done(uartdone),
-    .busy(),
-    .phyrx(uartin)
-);
-
-dbgtouart dbguart (
-    .n_rst(n_rst && cpuclklocked),
-    .clk(cpuclk),
-    .trig(print_trig_btn || uartprint),
-    .uartbusy(uartbusy),
-    .busy(printbusy),
-    .dbgsel(dbg_reg_sel),
-    .dbgreaden(),
-    .dbgout(dbg_reg_data),
-    .charout(charin),
-    .uarttxen(uarttxen)
-);
-
-wire ctluart_freeze;
-
-uarttoctl ctluart (
-    .n_rst(n_rst && cpuclklocked),
-    .clk(cpuclk),
-    .charin(charout),
-    .uartdone(uartdone),
-    .cpuhalt(dbg_trig_halt),
-    .cpustart(dbg_trig_unhalt),
-    .cpustep(dbg_trig_step),
-    .cpucycle(dbg_trig_cycle),
-    .cpurst(dbg_force_rst),
-    .cpuprint(uartprint),
-    .freeze(ctluart_freeze),
-    .dvpage(),
-    .pvpage(),
-    .progen(mem_instr_w_en),
-    .progaddr(mem_instr_w_addr),
-    .progdata(mem_instr_w_data)
-);
-
-assign dbg_suppress_clock = ctluart_freeze || printbusy;
 
 endmodule
