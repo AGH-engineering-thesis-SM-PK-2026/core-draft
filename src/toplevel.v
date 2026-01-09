@@ -1,32 +1,32 @@
 `timescale 1ns / 1ps
 
 module toplevel (
-    input               sysclk,         // System clock input
-    input               btnrst,         // Button to reset the CPU (active high)
-    input               btntrig,        // Button to trigger debug print (active high)
-    input               uartin,         // Debug UART receive line
-    output              uartout,        // Debug UART transmit line
-    output              led0,           //  \
-    output              led1,           //  | LED indicators for CPU state
-    output              led2,           //  |
-    output              led3,           //  /
-    input   [7:0]       in0,            // GPIO input
-    output  [7:0]       out0,           // GPIO output
-    output  [4:0]       vidr,           // VGA red
-    output  [5:0]       vidg,           // VGA green
-    output  [4:0]       vidb,           // VGA blue
-    output              vidhs,          // VGA hsync
-    output              vidvs           // VGA vsync
+    input               SYS_CLK,        // System clock input
+    input               BTN_RST,        // Button to reset the CPU (active high)
+    input               BTN_TRIG,       // Button to trigger debug print (active high)
+    input               DBG_UART_IN,    // Debug UART receive line
+    output              DBG_UART_OUT,   // Debug UART transmit line
+    output              LED0,           //  \
+    output              LED1,           //  | LED indicators for CPU state
+    output              LED2,           //  |
+    output              LED3,           //  /
+    input   [7:0]       GPIO0_IN,       // GPIO input
+    output  [7:0]       GPIO0_OUT,      // GPIO output
+    output  [4:0]       VID_R,           // VGA red
+    output  [5:0]       VID_G,           // VGA green
+    output  [4:0]       VID_B,           // VGA blue
+    output              VID_HS,          // VGA hsync
+    output              VID_VS           // VGA vsync
 );
 
-wire n_rst = !btnrst;
-wire btnprint;
+wire n_rst = !BTN_RST;
+wire print_trig_btn;
 
 debounce debouncet (
     .n_rst(n_rst && cpuclklocked),
     .clk(cpuclk),
-    .in(btntrig),
-    .out(btnprint)
+    .in(BTN_TRIG),
+    .out(print_trig_btn)
 );
 
 // Instruction memory bus
@@ -77,7 +77,7 @@ prescaler #(
     .CDIV(125)
 ) prescalercpu (
     .n_rst(n_rst),
-    .clkin(sysclk),
+    .clkin(SYS_CLK),
     .clkout(cpuclk),
     .locked(cpuclklocked)
 );
@@ -87,7 +87,7 @@ prescaler #(
     .CDIV(25)
 ) prescalervga (
     .n_rst(n_rst),
-    .clkin(sysclk),
+    .clkin(SYS_CLK),
     .clkout(vgaclk),
     .locked(vgaclklocked)
 );
@@ -116,10 +116,10 @@ cmu cmu1 (
 
 wire    [3:0] cpu_state;
 
-assign led0 = cpu_state[0];
-assign led1 = cpu_state[1];
-assign led2 = cpu_state[2];
-assign led3 = cpu_state[3];
+assign LED0 = cpu_state[0];
+assign LED1 = cpu_state[1];
+assign LED2 = cpu_state[2];
+assign LED3 = cpu_state[3];
 
 core cpu1 (
     .clk(cpuclk),
@@ -167,6 +167,8 @@ memory #(
  ********************************/
 
 // Data memory
+wire            mem_data_r_sel;
+
 wire            mem_data_r_en;
 wire    [31:0]  mem_data_r_addr;
 wire    [31:0]  mem_data_r_data;
@@ -182,7 +184,7 @@ busdev #(
     .addr(bus_w_addr),
     .deven(mem_data_w_en),
     .devaddr(mem_data_w_addr),
-    .busy()
+    .sel()
 );
 
 busdev #(
@@ -194,7 +196,7 @@ busdev #(
     .addr(bus_r_addr),
     .deven(mem_data_r_en),
     .devaddr(mem_data_r_addr),
-    .busy(mem_data_busy)
+    .sel(mem_data_r_sel)
 );
 
 memory_ba #(
@@ -216,6 +218,8 @@ memory_ba #(
 );
 
 // GPIO device
+wire            gpio0_r_sel;
+
 wire            gpio0_r_en;
 wire     [7:0]  gpio0_r_data;
 wire            gpio0_w_en;
@@ -229,7 +233,7 @@ busdev #(
     .addr(bus_w_addr),
     .deven(gpio0_w_en),
     .devaddr(),
-    .busy()
+    .sel()
 );
 
 busdev #(
@@ -241,7 +245,7 @@ busdev #(
     .addr(bus_r_addr),
     .deven(gpio0_r_en),
     .devaddr(),
-    .busy(gpio0_busy)
+    .sel(gpio0_r_sel)
 );
 
 gpio gpio0 (
@@ -250,8 +254,8 @@ gpio gpio0 (
     .wdata(bus_w_data[7:0]),
     .ren(gpio0_r_en),
     .rdata(gpio0_r_data),
-    .phyin(in0),
-    .phyout(out0)
+    .phyin(GPIO0_IN),
+    .phyout(GPIO0_OUT)
 );
 
 // Terminal device
@@ -268,7 +272,7 @@ busdev #(
     .addr(bus_w_addr),
     .deven(term0_deven),
     .devaddr(term0_devaddr),
-    .busy()
+    .sel()
 );
 
 term term0 (
@@ -280,16 +284,18 @@ term term0 (
     .inen(term0_deven),
     .busy(),
     .vidlm(vidlm),
-    .vidhs(vidhs),
-    .vidvs(vidvs)
+    .vidhs(VID_HS),
+    .vidvs(VID_VS)
 );
 
-assign vidr = {5{vidlm}};
-assign vidg = {6{vidlm}};
-assign vidb = {5{vidlm}};
+assign VID_R = {5{vidlm}};
+assign VID_G = {6{vidlm}};
+assign VID_B = {5{vidlm}};
 
-// At any point, only one device should respond, that is ensured by busdev modules
-assign bus_r_data = gpio0_r_data | mem_data_r_data;
+// Multiplex data bus read
+assign bus_r_data = mem_data_r_sel  ? mem_data_r_data       :
+                    gpio0_r_sel     ? {24'b0, gpio0_r_data} :
+                    32'b0;
 
 /********************************
  *        DEBUG INTERFACE       *
@@ -297,22 +303,21 @@ assign bus_r_data = gpio0_r_data | mem_data_r_data;
 
 dbgtoplevel dbgtop (
     .n_rst(n_rst && cpuclklocked),
-    .cpuclk(cpuclk),
-    .cpuclklocked(cpuclklocked),
-    .print_trig_btn(print_trig_btn),
-    .dbg_force_rst(dbg_force_rst),
-    .dbg_reg_sel(dbg_reg_sel),
-    .dbg_reg_data(dbg_reg_data),
-    .dbg_trig_halt(dbg_trig_halt),
-    .dbg_trig_unhalt(dbg_trig_unhalt),
-    .dbg_trig_step(dbg_trig_step),
-    .dbg_trig_cycle(dbg_trig_cycle),
-    .dbg_suppress_clock(dbg_suppress_clock),
-    .mem_instr_w_en(mem_instr_w_en),
-    .mem_instr_w_addr(mem_instr_w_addr),
-    .mem_instr_w_data(mem_instr_w_data),
-    .uartout(uartout),
-    .uartin(uartin)
+    .clk(cpuclk),
+    .btn_trig(dbg_trig_btn),
+    .cpu_rst(dbg_force_rst),
+    .reg_sel(dbg_reg_sel),
+    .reg_data(dbg_reg_data),
+    .cmu_trig_halt(dbg_trig_halt),
+    .cmu_trig_unhalt(dbg_trig_unhalt),
+    .cmu_trig_step(dbg_trig_step),
+    .cmu_trig_cycle(dbg_trig_cycle),
+    .cmu_suppress_clock(dbg_suppress_clock),
+    .prog_w_en(mem_instr_w_en),
+    .prog_w_addr(mem_instr_w_addr),
+    .prog_w_data(mem_instr_w_data),
+    .uart_out(DBG_UART_OUT),
+    .uart_in(DBG_UART_IN)
 );
 
 endmodule

@@ -8,34 +8,17 @@ module busdev #(
     OFFS = 32'h00000000,
     MASK = 4
 ) (
-    input wire en,
-    input wire [31:0] addr,
-    output wire deven,
-    output wire [MASK-1:0] devaddr,
-    output wire busy
+    input               en,         // enable signal from bus
+    input       [31:0]  addr,       // address from bus
+    output              deven,      // device enable signal
+    output  [MASK-1:0]  devaddr,    // address within device
+    output              sel         // high when device is selected
 );
 
 wire [31-MASK:0] base = addr[31:MASK];
 
-assign deven = base == BASE ? en : 1'b0;
-assign devaddr = addr[MASK-1:0];
-assign busy = base == BASE;
-
-// previously I've imagined a synchronous circuit - this turned out
-// unnecessary, the path is very short here with little logic in
-// between.
-//always @(posedge clk) begin
-//    deven <= 1'b0;
-//
-//    if (en) busy <= 1'b0;
-//
-//    if (en && base == BASE) begin
-//        devaddr <= addr[MASK-1:0];
-//        deven <= 1'b1;
-//        busy <= 1'b1;
-//    end
-//    
-//    if (!n_rst) busy <= 1'b0;
-//end
+assign deven    = base == BASE ? en : 1'b0;
+assign devaddr  = addr[MASK-1:0];
+assign sel      = base == BASE;
 
 endmodule
