@@ -1,17 +1,17 @@
 `timescale 1ns / 1ps
 
-// TODO
+// ASCII to font glyph index converter
 // Szymon Miękina - 03.12.2025
 
 module asciitofont (
-    input wire [7:0] charin,
-    output reg [5:0] fontout,
-    output reg nonprint,
-    output reg newline    
+    input wire [7:0]    charin,     // ASCII input
+    output reg [5:0]    fontout,    // font index output
+    output reg          nonprint,   // is character not printable 0x00-0x1f
+    output reg          newline     // is character a newline '\n'
 );
 
 // careful, this module is asynchronous and thus glitches can propagate 
-// to signals 'nonprint', 'newline', use generous delay
+// to signals 'nonprint', 'newline'
 always @(*) begin
     // a little cheat of a remapping
     // 0x00 -> 0x00, 0x20 -> 0x00, 0x40 -> 0x20, 0x60 -> 0x20

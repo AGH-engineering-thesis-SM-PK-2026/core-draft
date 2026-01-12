@@ -1,21 +1,31 @@
 `timescale 1ns / 1ps
 
-// TODO
+// VGA terminal controller
+// The terminal and CPU run in different clock domains, and it is necessary to
+// cross clock domains safely. The module also converts ASCII to font glyphs'
+// indices. The modules stores the current position of the virtual cursor,
+// under which new characters will appear. The cursor can also be controlled
+// by the user.
+// The user can write to 4 locations:
+// - WRITE1 (00) - write a character under the cursor
+// - WRITEX (01) - change X position of cursor
+// - WRITEY (10) - change Y position of cursor
+// - WRITEA (11) - write attribute to the character under the cursor (not used)
 // Szymon Miękina - 03.12.2025
 
 module termctl (
-    input wire n_rst,
-    input wire cpuclk,
-    input wire vgaclk,
-    input wire [1:0] dstin,
-    input wire [7:0] datain,
-    input wire trig,
-    output reg busy,
-    output reg [6:0] xwrite,
-    output reg [4:0] ywrite,
-    input wire writeack,
-    output reg writereq,
-    output wire [7:0] charout
+    input wire          n_rst,
+    input wire          cpuclk,     // CPU side clock signal
+    input wire          vgaclk,     // VGA side clock signal
+    input wire [1:0]    dstin,      // location write destination
+    input wire [7:0]    datain,     // location write data
+    input wire          trig,       // write trigger
+    output reg          busy,       // controller busy writing to framebuffer
+    output reg [6:0]    xwrite,     // write x component
+    output reg [4:0]    ywrite,     // write y component
+    input wire          writeack,   // write acknowledged by framebuffer
+    output reg          writereq,   // write request to framebuffer
+    output wire [7:0]   charout     // char out to framebuffer
 );
 
 wire nonprint;
@@ -23,6 +33,7 @@ wire newline;
 
 wire [5:0] fontout;
 
+// convert ASCII to glyph index
 asciitofont tofont (
     .charin(datain),
     .fontout(fontout),
@@ -89,6 +100,7 @@ always @(posedge cpuclk) begin
         wrstate <= `WR_WAITE;
     end
     `WR_WAIT1: begin
+        // wait for the framebuffer to finish the char write
         u_writereq <= 1'b0;
         if (!s_writeack) wrstate <= `WR_NEXT1;
     end
@@ -96,6 +108,7 @@ always @(posedge cpuclk) begin
         wrstate <= `WR_FINISH;
     end
     `WR_NEXT1: begin
+        // advance cursor to the next column or line
         xwrite <= xwrite + 1'b1;
         if (newline || xwrite == 99) begin
             ywrite <= ywrite + 1'b1;

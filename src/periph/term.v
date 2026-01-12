@@ -1,19 +1,24 @@
 `timescale 1ns / 1ps
 
-// TODO
+// VGA Terminal Peripheral
+// The peripheral maps 4 registers:
+// OUT  (0) - write to display a character at the position of the cursor
+// X    (1) - write to change cursors' X coordinate
+// Y    (2) - write to change cursors' Y coordinate
+// ATTR (3) - set character attributes (currently no-op)
 // Szymon Miękina - 04.12.2025
 
 module term (
-    input wire n_rst,
-    input wire cpuclk,
-    input wire vgaclk,
-    input wire [1:0] addrin,
-    input wire [7:0] datain,
-    input wire inen,
-    output wire busy,
-    output wire vidlm,
-    output wire vidhs,
-    output wire vidvs
+    input wire          n_rst,
+    input wire          cpuclk, // CPU side clock signal
+    input wire          vgaclk, // VGA side clock signal
+    input wire [1:0]    addrin, // register write address
+    input wire [7:0]    datain, // register write data
+    input wire          inen,   // write enable
+    output wire         busy,   // is busy writing to framebuffer
+    output wire         vidlm,  // video luminance signal
+    output wire         vidhs,  // video hsync
+    output wire         vidvs   // video vsync
 );
 
 wire [7:0] charout;

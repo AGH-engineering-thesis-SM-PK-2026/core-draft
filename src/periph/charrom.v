@@ -1,19 +1,22 @@
 `timescale 1ns / 1ps
 
-// TODO
+// Character ROM
+// Stores visual representation of font glyphs as read-only memory
+// Each character can be selected by index and then the row of the
+// character (characters are drawn row-by-row).
 // Szymon Miękina - 17.10.2025
 
 module charrom #(
-    FONT = "",
-    WIDTH = 4,
-    CHARS = 16,
-    BITS = 4
+    FONT = "",  // font file
+    WIDTH = 4,  // character width in pixels
+    CHARS = 16, // character count
+    BITS = 4    // bits needed to store character index
 ) (
-    input wire clk,
-    input wire readen,
-    input wire [BITS - 1:0] csel,
-    input wire [2:0] y,
-    output reg [WIDTH - 1:0] rowout
+    input wire                  clk,
+    input wire                  readen, // read enable
+    input wire [BITS - 1:0]     csel,   // character select (glyph index)
+    input wire [2:0]            y,      // row select
+    output reg [WIDTH - 1:0]    rowout  // row output
 );
 
 (* rom_style = "block" *)

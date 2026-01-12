@@ -1,11 +1,11 @@
 `timescale 1ns / 1ps
 
-// TODO
+// 4-bit hex to ASCII character converter
 // Szymon Miękina - 04.11.2025
 
 module hextoascii (
-    input wire [3:0] hexin,
-    output reg [7:0] charout
+    input wire [3:0]    hexin,  // 4-bit input
+    output reg [7:0]    charout // ASCII output
 );
 
 always @(*) begin

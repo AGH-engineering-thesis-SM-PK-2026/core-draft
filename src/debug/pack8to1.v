@@ -1,17 +1,21 @@
 `timescale 1ns / 1ps
 
-// TODO
+// Pack 8 4-bit nibbles into a 32-bit word
+// A specialised shift registers: 8 4-bit can be shifted in one-by-one
+// to obtain 32-bit value. Useful for assembling words from UART frames.
+// The 'full' condition is raised when the 32-bit word is complete, while
+// 'empty' is only high when the buffer is empty.
 // Szymon Miękina - 24.11.2025
 
 module pack8to1 (
-    input wire n_rst,
-    input wire clk,
-    input wire inen,
-    input wire [3:0] in,
-    input wire outen,
-    output reg [31:0] out,
-    output reg full,
-    output reg empty
+    input wire          n_rst,
+    input wire          clk,
+    input wire          inen,   // input enable
+    input wire [3:0]    in,     // 4-bit input
+    input wire          outen,  // confirm the output was read
+    output reg [31:0]   out,    // 32-bit assembled output
+    output reg          full,   // output is ready
+    output reg          empty   // buffer is empty
 );
 
 reg [3:0] cnt;
