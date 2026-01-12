@@ -1,19 +1,28 @@
 `timescale 1ns / 1ps
 
-// TODO
+// Debug info to UART controller
+// The module fetches the core state (PC + registers) from the CPU, one-by-one,
+// converts it to ASCII representation and sends on the UART interface.
+// During the debug print process, the CPU is stopped. The process itself takes
+// a while, since the module has to wait for the UART transmitter busy state,
+// before the next byte can be sent.
+// The module can source characters from 1-character buffer (and send an 
+// arbitrary ASCII character e.g. a field separator), or from unpack1to8
+// buffer (send a 32-bit value encoded as 8-character hexadecimal ASCII).
+// The print packet looks the following: "P00000000,11115555, ... ,FFFFAAAA\n"
 // Szymon Miękina - 04.11.2025
 
 module dbgtouart (
-    input wire n_rst,
-    input wire clk,
-    input wire trig,
-    input wire uartbusy,
-    output reg busy,
-    output reg [4:0] dbgsel,
-    output reg dbgreaden,
-    input wire [31:0] dbgout,
-    output wire [7:0] charout,
-    output reg uarttxen
+    input wire          n_rst,
+    input wire          clk,
+    input wire          trig,       // trigger the start of print
+    input wire          uartbusy,   // uart is busy sending
+    output reg          busy,       // signify the print process is ongoing
+    output reg [4:0]    dbgsel,     // debug register selector
+    output reg          dbgreaden,  // debug register read enable
+    input wire [31:0]   dbgout,     // debug register data input
+    output wire [7:0]   charout,    // to UART byte input
+    output reg          uarttxen    // UART transmitter enable
 );
 
 wire full;
@@ -28,8 +37,9 @@ wire [3:0] hexout;
 wire [7:0] hexchar;
 reg [7:0] sigchar;
 
+// srcsel: '1': send a single character, '0': source a character from the
+//         unpack1to8 buffer (print the 32-bit value)
 reg srcsel;
-
 assign charout = srcsel ? sigchar : hexchar;
 
 hextoascii toascii (

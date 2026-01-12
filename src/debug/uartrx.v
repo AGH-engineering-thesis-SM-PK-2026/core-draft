@@ -1,19 +1,23 @@
 `timescale 1ns / 1ps
 
-// TODO
+// UART receiver
+// Detects start condition (low state of 'phyrx') and receives the byte.
+// Has a busy flag to notify when the module is receiving.
+// As soon the full byte arrives the 'done' flag is raised. The 'done' flag
+// remains high until a start bit is detected.
 // Szymon Miękina - 24.11.2025
 
 module uartrx #(
-    PREDIV = 833, // 9600bps @ f=8MHz
-    PREMID = 400, // midpoint for sampling
-    PREBITS = 10 // bits needed for prescaler
+    PREDIV = 833,   // 9600bps @ f=8MHz
+    PREMID = 400,   // midpoint for sampling
+    PREBITS = 10    // bits needed for prescaler
 ) (
-    input wire n_rst,
-    input wire clk,
-    output reg [7:0] charout,
-    output reg done,
-    output reg busy,
-    input wire phyrx
+    input wire          n_rst,
+    input wire          clk,
+    output reg [7:0]    charout,    // byte output
+    output reg          done,       // is output ready
+    output reg          busy,       // is receiving
+    input wire          phyrx       // physical RX line input
 );
 
 reg [3:0] cnt;

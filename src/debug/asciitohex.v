@@ -1,12 +1,12 @@
 `timescale 1ns / 1ps
 
-// TODO
+// ASCII to 4-bit hex converter
 // Szymon Miękina - 24.11.2025
 
 module asciitohex (
-    input wire [7:0] charin,
-    output reg [3:0] hexout,
-    output reg nothex
+    input wire [7:0]    charin, // ASCII input
+    output reg [3:0]    hexout, // 4-bit output
+    output reg          nothex  // error occured, not a valid character
 );
 
 always @(*) begin

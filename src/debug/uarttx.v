@@ -1,18 +1,21 @@
 `timescale 1ns / 1ps
 
-// TODO
+// UART transmitter
+// Allows sending bytes on the UART interface.
+// Has a busy flag to notify when the module is transmitting and
+// will not accept new bytes.
 // Szymon Miękina - 04.11.2025
 
 module uarttx #(
-    PREDIV = 833, // 9600bps @ f=8MHz
-    PREBITS = 10 // bits needed for prescaler
+    PREDIV = 833,   // 9600bps @ f=8MHz
+    PREBITS = 10    // bits needed for prescaler
 ) (
-    input wire n_rst,
-    input wire clk,
-    input wire [7:0] charin,
-    input wire txen,
-    output reg busy,
-    output reg phytx
+    input wire          n_rst,
+    input wire          clk,
+    input wire [7:0]    charin, // byte to be sent
+    input wire          txen,   // send trigger
+    output reg          busy,   // is sending
+    output reg          phytx   // physical TX line output
 );
 
 reg [7:0] data;

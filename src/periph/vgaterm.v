@@ -1,18 +1,23 @@
 `timescale 1ns / 1ps
 
-// TODO
+// VGA terminal main logic
+// Controls the timing of framebuffer, charrom and actually displays stuff
+// on the screen. The terminal holds a currently displayed row
+// while the next row is loaded in. The framebuffer memory arbiter switches
+// between read and write phases for every character time (time it takes to
+// output 8 pixels onto the screen).
 // Szymon Miękina - 27.10.2025
 
 module vgaterm (
-    input wire clk,
-    input wire [10:0] xread,
-    input wire [9:0] yread,
-    input wire [6:0] xwrite,
-    input wire [4:0] ywrite,
-    input wire [7:0] charin,
-    input wire writereq, // queue for writing
-    output reg writeack, // acknowledge request / busy writing
-    output reg out
+    input wire          clk,
+    input wire [10:0]   xread,      // read x component
+    input wire [9:0]    yread,      // read y component
+    input wire [6:0]    xwrite,     // write x component
+    input wire [4:0]    ywrite,     // write y component
+    input wire [7:0]    charin,     // character to write
+    input wire          writereq,   // queue for writing
+    output reg          writeack,   // acknowledge request / busy writing
+    output reg          out         // luminance output
 );
 
 // triggers every 8th x change in the middle of char drawing
@@ -38,6 +43,9 @@ charrom #(
 );
 
 // display logic
+// double-buffered row output - the terminal alternates
+// between those two rows to prevent video artefacts on the screen,
+// between two horizontally adjacent characters
 always @(*) begin
     case (xread[3:0])
         4'b0000: out = row1[7];

@@ -1,35 +1,39 @@
 `timescale 1ns / 1ps
 
-// TODO
+// UART to remote control
+// Captures incoming UART frames and parses them, to execute remote commands
+// or handle program uploads. The content of UART frames directly influences
+// the way the state machine transitions to next state. Every command has a
+// one character ID at the very start.
 // Szymon Miękina - 24.11.2025
 
 // H - halt
 // Z - ztart
-// S - step cpu
+// S - step/cycle cpu
 // R - reset cpu
-// P - program, first word is prog size, rest is prog data
-// V - data/prog view page index
+// [ - program upload
+// V - data/prog view page index (not used)
 
 module uarttoctl #(
-    parameter DVPBITS = 8, // data view offset bits
-    parameter PVPBITS = 8 // prog view offset bits
+    parameter DVPBITS = 8,  // data view offset bits
+    parameter PVPBITS = 8   // prog view offset bits
 ) (
-    input wire n_rst,
-    input wire clk,
-    input wire [7:0] charin,
-    input wire uartdone,
-    output reg cpuhalt,
-    output reg cpustart,
-    output reg cpustep,
-    output reg cpucycle,
-    output reg cpurst,
-    output reg cpuprint,
-    output reg freeze,
-    output reg [DVPBITS-1:0] dvpage,
-    output reg [PVPBITS-1:0] pvpage,
-    output reg progen,
-    output reg [19:0] progaddr,
-    output wire [31:0] progdata
+    input wire                  n_rst,
+    input wire                  clk,
+    input wire [7:0]            charin,     // UART byte input
+    input wire                  uartdone,   // is UART byte ready
+    output reg                  cpuhalt,    // should CPU halt
+    output reg                  cpustart,   // should CPU start
+    output reg                  cpustep,    // should CPU step
+    output reg                  cpucycle,   // should CPU cycle
+    output reg                  cpurst,     // should CPU reset
+    output reg                  cpuprint,   // should print CPU state
+    output reg                  freeze,     // should the CPU freeze
+    output reg [DVPBITS-1:0]    dvpage,     // data view page index (not used)
+    output reg [PVPBITS-1:0]    pvpage,     // prog view page index (not used)
+    output reg                  progen,     // prog memory write enable
+    output reg [19:0]           progaddr,   // prog upload address write
+    output wire [31:0]          progdata    // prog upload data to be written
 );
 
 reg busy;
@@ -193,6 +197,7 @@ always @(posedge clk) begin
         end        
     end
     `CTL_READST: begin
+        // parse second character of the S command
         if (inbound) begin
             case (data)
             "1": cpustep <= 1'b1;

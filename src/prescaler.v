@@ -1,17 +1,25 @@
 `timescale 1ns / 1ps
 
-// TODO
+// Clock prescaler based on the MMCME2 instance.
+// Zybo provides a 125MHz clock source.
+// The FMUL and FDIV set the freq. multiplier and divider for the VCO:
+// f_VCO = (FMUL/FDIV) * 125MHz
+// The f_VCO has to stay between 600 and 1200 MHz.
+// The final freq value can be obtained from this formula:
+// f_OUT = (1/CDIV) * f_VCO
+// The MMCME2 needs some time to stabilise - locked output pin will
+// transition to high when the clock source becomes stable.
 // Szymon Miękina - 16.10.2025
 
 module prescaler #(
-    FMUL = 40.0,
-    FDIV = 1,
-    CDIV = 25
+    FMUL = 40.0,    // VCO freq. mult.
+    FDIV = 1,       // VCO freq. div.
+    CDIV = 25       // clock freq. div.
 ) (
-    input wire n_rst,
-    input wire clkin,
-    output wire clkout,
-    output reg locked
+    input wire  n_rst,
+    input wire  clkin,  // system clock input
+    output wire clkout, // clock signal output
+    output reg  locked  // is clock ready to be used
 );
 
 wire feedback;

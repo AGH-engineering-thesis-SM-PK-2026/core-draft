@@ -1,22 +1,23 @@
 `timescale 1ns / 1ps
 
-// TODO
+// Character Framebuffer
+// Does not assume any particular addressing scheme, acts as simple RAM
 // Szymon Miękina - 27.10.2025
 
 module framebuf #(
-    INIT = "",
-    XBITS = 7, 
-    YBITS = 5,
-    COLS = 100, 
-    ROWS = 32
+    INIT = "",  // init file for terminal framebuffer
+    XBITS = 7,  // bits needed to store column index
+    YBITS = 5,  // bits needed to store line index
+    COLS = 100, // text columns
+    ROWS = 32   // text lines
 ) (
-    input wire clk,
-    input wire readen,
-    input wire writeen,
-    input wire [XBITS + YBITS - 1:0] readaddr,
-    input wire [XBITS + YBITS - 1:0] writeaddr,
-    input wire [7:0] charin,
-    output reg [7:0] charout
+    input wire                          clk,
+    input wire                          readen,     // read enable
+    input wire                          writeen,    // write enable
+    input wire [XBITS + YBITS - 1:0]    readaddr,   // read address
+    input wire [XBITS + YBITS - 1:0]    writeaddr,  // write address
+    input wire [7:0]                    charin,     // write character data
+    output reg [7:0]                    charout     // read character data
 );
 
 // chars will be organized in column-major order
