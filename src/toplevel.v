@@ -258,6 +258,48 @@ gpio gpio0 (
     .phyout(GPIO0_OUT)
 );
 
+// Timer device
+wire            tim0_r_sel;
+
+wire            tim0_r_en;
+wire     [7:0]  tim0_r_data;
+wire            tim0_w_en;
+
+busdev #(
+    .BASE(28'h0000002),
+    .OFFS(32'h00000020),
+    .MASK(4)
+) tim0_w (
+    .en(bus_w_en),
+    .addr(bus_w_addr),
+    .deven(tim0_w_en),
+    .devaddr(),
+    .sel()
+);
+
+busdev #(
+    .BASE(28'h0000002),
+    .OFFS(32'h00000020),
+    .MASK(4)
+) tim0_r (
+    .en(bus_r_en),
+    .addr(bus_r_addr),
+    .deven(tim0_r_en),
+    .devaddr(),
+    .sel(tim0_r_sel)
+);
+
+timer tim0 (
+    .clk(cpuclk),
+    .n_rst(n_rst && cpuclklocked),
+    .bus_r_en(tim0_r_en),
+    .bus_r_addr(bus_r_addr),
+    .bus_r_data(tim0_r_data),
+    .bus_w_en(tim0_w_en),
+    .bus_w_addr(bus_w_addr),
+    .bus_w_data(bus_w_data)
+);
+
 // Terminal device
 wire            vidlm;
 wire            term0_deven;
@@ -294,6 +336,7 @@ assign VID_B = {5{vidlm}};
 
 // Multiplex data bus read
 assign bus_r_data = mem_data_r_sel  ? mem_data_r_data       :
+                    tim0_r_sel      ? {24'b0, tim0_r_data}  :
                     gpio0_r_sel     ? {24'b0, gpio0_r_data} :
                     32'b0;
 

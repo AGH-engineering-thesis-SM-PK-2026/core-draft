@@ -3,8 +3,6 @@
  *  Author: Piotr Kadziela
  *  Description:
  *      Register file for RISC-V core.
- *      Resetting the register file causes all the registers to be zeroed 
- *    sequentially. After that, the 'ready' signal goes high.
  *****************************************************************************/
 
 module regfile (
@@ -26,22 +24,16 @@ module regfile (
 );
 
 reg [31:0] reg_data [0:31];           // 32 registers of 32 bits each
-reg [4:0] rst_cnt;                    // reset counter needed for sequential reset
 
 assign r_data_1     = reg_data[r_sel_1];
 assign r_data_2     = reg_data[r_sel_2];
 assign dbg_reg_data = reg_data[dbg_reg_sel];
-assign rst_ready    = (rst_cnt == 5'b00000);   // ready when reset counter overflows
 
 always @(posedge clk) begin
-    if (!rst_n) begin           // Start reset process
-        rst_cnt <= 5'b00001;
-        reg_data[0] <= 32'b0;   // x0 is always zero, but we still need to set it during reset
+    if (!rst_n) begin: CLEAR_REG
+        integer i;
+        for (i = 0; i < 32; i = i + 1) reg_data[i] <= 32'b0;
     end
-    else if (!rst_ready) begin  // During reset, zero registers sequentially
-        reg_data[rst_cnt] <= 32'b0;
-        rst_cnt <= rst_cnt + 1;
-    end 
     else if (w_en && w_sel != 5'b00000) begin  // Normal operation: write to register (but x0 is always zero)
         reg_data[w_sel] <= w_data;
     end

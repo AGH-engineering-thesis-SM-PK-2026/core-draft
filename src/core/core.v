@@ -87,7 +87,6 @@ assign funct7       = instr[31:25];
 assign alu_src_sel  = opcode[5];    // differentiate between R-type and I-type instructions
 
 // regfile interface
-wire            reg_rst_ready;      // register file reset finished
 wire    [31:0]  reg_r_data_1;       // data from the first register
 wire    [31:0]  reg_r_data_2;       // data from the second register
 reg     [31:0]  reg_w_data;         // data to write
@@ -111,7 +110,6 @@ assign dbg_reg_data = (dbg_reg_sel == 5'b00000 ? pc : dbg_reg_out);
 regfile regfile1 (
     .clk(clk),
     .rst_n(rst_n),
-    .rst_ready(reg_rst_ready),
 
     .r_sel_1(rs1),
     .r_sel_2(rs2),
@@ -187,8 +185,7 @@ always @(posedge clk) begin
                 mem_data_w_mode <= 2'b00;
                 mem_data_r_mode <= 2'b00;
                 
-                // Wait for the register file to finish resetting
-                state <= reg_rst_ready ? `CORE_STATE_INIT2 : `CORE_STATE_INIT1;
+                state <= `CORE_STATE_INIT2;
             end
             `CORE_STATE_INIT2: begin
                 state <= `CORE_STATE_FETCH;
