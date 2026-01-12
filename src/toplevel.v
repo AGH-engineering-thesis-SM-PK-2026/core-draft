@@ -114,6 +114,7 @@ cmu cmu1 (
  *           MCU CORE           *
  ********************************/
 
+wire          n_rst_cpu = n_rst && cpuclklocked && !dbg_force_rst;
 wire    [3:0] cpu_state;
 
 assign LED0 = cpu_state[0];
@@ -123,7 +124,7 @@ assign LED3 = cpu_state[3];
 
 core cpu1 (
     .clk(cpuclk),
-    .rst_n(n_rst && cpuclklocked && !dbg_force_rst),
+    .rst_n(n_rst_cpu),
     .clk_enable(clk_enable),
     .cycle_end(cycle_end),
     .breakpoint_hit(cpubreak),
@@ -204,7 +205,7 @@ memory_ba #(
     .INIT_FILE("init_data_clear.mem")
 ) mem_data (
     .clk(cpuclk),
-    .rst_n(n_rst && cpuclklocked),
+    .rst_n(n_rst_cpu),
     .clk_enable(clk_enable),
     .r_en(mem_data_r_en),
     .r_addr(mem_data_r_addr),
@@ -262,8 +263,10 @@ gpio gpio0 (
 wire            tim0_r_sel;
 
 wire            tim0_r_en;
-wire     [7:0]  tim0_r_data;
+wire     [32:0] tim0_r_data;
+wire     [32:0] tim0_r_addr;
 wire            tim0_w_en;
+wire     [32:0] tim0_w_addr;
 
 busdev #(
     .BASE(28'h0000002),
@@ -273,7 +276,7 @@ busdev #(
     .en(bus_w_en),
     .addr(bus_w_addr),
     .deven(tim0_w_en),
-    .devaddr(),
+    .devaddr(tim0_w_addr),
     .sel()
 );
 
@@ -285,18 +288,19 @@ busdev #(
     .en(bus_r_en),
     .addr(bus_r_addr),
     .deven(tim0_r_en),
-    .devaddr(),
+    .devaddr(tim0_r_addr),
     .sel(tim0_r_sel)
 );
 
 timer tim0 (
     .clk(cpuclk),
-    .n_rst(n_rst && cpuclklocked),
+    .n_rst(n_rst_cpu),
+    .clk_enable(clk_enable),
     .bus_r_en(tim0_r_en),
-    .bus_r_addr(bus_r_addr),
+    .bus_r_addr(tim0_r_addr),
     .bus_r_data(tim0_r_data),
     .bus_w_en(tim0_w_en),
-    .bus_w_addr(bus_w_addr),
+    .bus_w_addr(tim0_w_addr),
     .bus_w_data(bus_w_data)
 );
 

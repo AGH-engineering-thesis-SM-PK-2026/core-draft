@@ -12,6 +12,7 @@
 module timer (
     input               clk,
     input               n_rst,
+    input               clk_enable,   // clock enable signal
 
     // Data bus interface
     input               bus_r_en,      // read enable
@@ -30,9 +31,9 @@ reg        control;      // control register: high = enabled, low = disabled
 always @(posedge clk) begin
     if (!n_rst) begin
         counter <= 32'b0;
-        control <= 1'b0;
+        control <= 1'b1;    // enabled by default
     end
-    else begin
+    else if (clk_enable) begin
         // Increment counter if enabled
         counter <= counter + control;
 
